@@ -129,3 +129,24 @@ def session_import_proposals(
         )
         count += 1
     typer.echo(f"Imported {count} proposals into {session_id}")
+
+
+@app.command("apply")
+def apply_cmd(
+    session_id: str,
+    project: Path = typer.Option(..., "--project", help="Project root path"),
+    force: bool = typer.Option(False, "--force", help="Overwrite non-scaffolded topics"),
+):
+    from strataforge.core.apply_engine import ApplyConflictError, apply_session
+    from strataforge.core.paths import ProjectPaths
+
+    paths = ProjectPaths(project)
+    try:
+        created = apply_session(paths, session_id, force=force)
+    except ApplyConflictError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(1)
+    for topic in created:
+        typer.echo(f"Created scaffold {topic.id} at {topic.path}")
+    if not created:
+        typer.echo("No accepted create_component proposals to apply.")

@@ -104,3 +104,16 @@ def set_proposal_action(
     session.updated_at = reviewed_at
     save_session(paths, session, records)
     return proposal
+
+
+def promote_proposal(paths: ProjectPaths, proposal_id: str) -> Proposal:
+    session_id = _find_session_for_proposal(paths, proposal_id)
+    if session_id is None:
+        raise KeyError(f"Proposal not found: {proposal_id}")
+    records = get_proposal_records(paths, session_id)
+    proposal = Proposal.model_validate(records[proposal_id])
+    proposal.state = ProposalState.promoted_to_scaffold
+    records[proposal_id] = proposal.model_dump(mode="json")
+    session = load_session(paths, session_id)
+    save_session(paths, session, records)
+    return proposal

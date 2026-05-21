@@ -72,6 +72,16 @@ def list_topics(paths: ProjectPaths) -> list[TopicRecord]:
     manifest = load_manifest(paths)
     return manifest.topics
 
+def try_get_topic(paths: ProjectPaths, topic_id: str) -> TopicRecord | None:
+    manifest = load_manifest(paths)
+    for t in manifest.root_areas + manifest.topics:
+        if t.id == topic_id:
+            text = (paths.root / t.path).read_text()
+            topic, _body = load_topic_file(text)
+            return topic
+    return None
+
+
 def get_topic(paths: ProjectPaths, topic_id: str) -> tuple[TopicRecord, str]:
     manifest = load_manifest(paths)
     for t in manifest.root_areas + manifest.topics:
