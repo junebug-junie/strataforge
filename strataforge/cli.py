@@ -5,6 +5,8 @@ import typer
 from strataforge import __version__
 
 app = typer.Typer(no_args_is_help=True, name="strata")
+session_app = typer.Typer(no_args_is_help=True)
+app.add_typer(session_app, name="session")
 
 
 @app.callback(invoke_without_command=True)
@@ -77,3 +79,53 @@ def validate_cmd(path: str = "."):
         topic = f" ({issue.topic_id})" if issue.topic_id else ""
         typer.echo(f"{issue.code}{topic}: {issue.message}", err=True)
     raise typer.Exit(1)
+
+
+@session_app.command("start")
+def session_start(
+    project: Path = typer.Option(..., "--project", help="Project root path"),
+    title: str = typer.Option(..., "--title", help="Session title"),
+    mode: str = typer.Option("intake", "--mode", help="Session mode"),
+):
+    from datetime import datetime, timezone
+
+    from strataforge.core.paths import ProjectPaths
+    from strataforge.core.session_store import create_session
+
+    paths = ProjectPaths(project)
+    session = create_session(
+        paths,
+        title=title,
+        mode=mode,
+        created_at=datetime.now(timezone.utc),
+    )
+    typer.echo(f"Started {session.id}")
+
+
+@session_app.command("import-proposals")
+def session_import_proposals(
+    session_id: str,
+    file: Path = typer.Option(..., "--file", help="Proposal bundle JSON file"),
+    project: Path = typer.Option(..., "--project", help="Project root path"),
+):
+    import json
+
+    from strataforge.core.paths import ProjectPaths
+    from strataforge.core.proposal_store import add_proposal
+
+    paths = ProjectPaths(project)
+    bundle = json.loads(file.read_text())
+    count = 0
+    for item in bundle.get("proposals", []):
+        add_proposal(
+            paths,
+            session_id=session_id,
+            kind=item["kind"],
+            title=item["title"],
+            summary=item.get("summary", ""),
+            rationale=item.get("rationale", ""),
+            proposed_changes=item.get("proposed_changes", {}),
+            topic_id=item.get("topic_id"),
+        )
+        count += 1
+    typer.echo(f"Imported {count} proposals into {session_id}")
