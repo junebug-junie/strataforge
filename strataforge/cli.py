@@ -112,11 +112,12 @@ def session_import_proposals(
 
     from strataforge.core.paths import ProjectPaths
     from strataforge.core.proposal_store import add_proposal
+    from strataforge.llm.manual_import import parse_proposal_bundle
 
     paths = ProjectPaths(project)
-    bundle = json.loads(file.read_text())
+    bundle = parse_proposal_bundle(json.loads(file.read_text()))
     count = 0
-    for item in bundle.get("proposals", []):
+    for item in bundle["proposals"]:
         add_proposal(
             paths,
             session_id=session_id,
@@ -129,6 +130,25 @@ def session_import_proposals(
         )
         count += 1
     typer.echo(f"Imported {count} proposals into {session_id}")
+
+
+@session_app.command("set-input")
+def session_set_input(
+    session_id: str,
+    project: Path = typer.Option(..., "--project", help="Project root path"),
+    prompt_file: Path = typer.Option(..., "--prompt-file", help="Intake prompt markdown file"),
+):
+    from datetime import datetime, timezone
+
+    from strataforge.core.paths import ProjectPaths
+    from strataforge.core.session_store import load_session, save_session
+
+    paths = ProjectPaths(project)
+    session = load_session(paths, session_id)
+    session.inputs["source_prompt"] = prompt_file.read_text()
+    session.updated_at = datetime.now(timezone.utc)
+    save_session(paths, session)
+    typer.echo(f"Stored source prompt on {session_id}")
 
 
 @app.command("apply")
