@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field
 
 from strataforge.core.apply_engine import ApplyConflictError, apply_session
 from strataforge.core.proposal_store import add_proposal, load_proposal
-from strataforge.core.session_store import create_session, load_session
+from strataforge.core.session_store import create_session, load_session, save_session
 from strataforge.llm.manual_import import parse_proposal_bundle
 from strataforge.server.deps import resolve_project_paths
 
@@ -31,6 +31,10 @@ class ImportProposalsResponse(BaseModel):
 
 class ApplySessionResponse(BaseModel):
     created: list[dict]
+
+
+class UpdateSessionRequest(BaseModel):
+    inputs: dict[str, str | int | float | bool | None] = Field(default_factory=dict)
 
 
 @router.post("", status_code=201)
@@ -64,6 +68,19 @@ def get_session_detail(project_id: str, session_id: str) -> dict:
     data = session.model_dump(mode="json")
     data["proposals"] = proposals
     return data
+
+
+@router.put("/{session_id}")
+def update_session(project_id: str, session_id: str, body: UpdateSessionRequest) -> dict:
+    paths = resolve_project_paths(project_id)
+    try:
+        session = load_session(paths, session_id)
+    except (FileNotFoundError, KeyError, ValueError):
+        raise HTTPException(status_code=404, detail=f"Session not found: {session_id}") from None
+    session.inputs.update(body.inputs)
+    session.updated_at = datetime.now(timezone.utc)
+    save_session(paths, session)
+    return session.model_dump(mode="json")
 
 
 @router.post("/{session_id}/import", response_model=ImportProposalsResponse)

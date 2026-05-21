@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { listProjects, listTopics, type ProjectSummary, type TopicNode } from "../api";
 import AtlasTree from "./AtlasTree";
-import TopicEditor from "./TopicEditor";
+import PairingPlane from "./PairingPlane";
 
 interface ProjectShellProps {
   selectedTopicId: string | null;
@@ -93,13 +93,12 @@ export default function ProjectShell({ selectedTopicId, onSelectTopic }: Project
     return <p style={{ padding: "16px" }}>No projects found. Run strata init to create one.</p>;
   }
 
-  const selectedProject = projects.find((p) => p.project_id === projectId);
-
   return (
     <div style={{ display: "flex", minHeight: "100vh", fontFamily: "system-ui, sans-serif" }}>
       <aside
         style={{
-          width: "280px",
+          width: "260px",
+          flexShrink: 0,
           borderRight: "1px solid #ddd",
           padding: "12px",
           background: "#fafafa",
@@ -131,20 +130,28 @@ export default function ProjectShell({ selectedTopicId, onSelectTopic }: Project
         />
       </aside>
 
-      <main style={{ flex: 1, padding: "16px" }}>
-        <h1 style={{ margin: "0 0 8px", fontSize: "20px" }}>
-          {selectedProject?.title ?? "Project"}
-        </h1>
-        {selectedTopicId && projectId ? (
-          <TopicEditor
-            projectId={projectId}
-            topicId={selectedTopicId}
-            onUpdated={refreshTopics}
-          />
-        ) : (
-          <p style={{ color: "#666" }}>Select a topic from the atlas tree.</p>
-        )}
-      </main>
+      {projectId && (
+        <PairingPlane
+          projectId={projectId}
+          selectedTopicId={selectedTopicId}
+          onTopicsChanged={refreshTopics}
+        />
+      )}
+
+      <aside
+        style={{
+          width: "240px",
+          flexShrink: 0,
+          padding: "16px",
+          background: "#fafafa",
+          borderLeft: "1px solid #ddd",
+        }}
+      >
+        <h2 style={{ margin: "0 0 8px", fontSize: "14px", fontWeight: 600 }}>Coherence Radar</h2>
+        <p style={{ margin: 0, fontSize: "13px", color: "#6b7280" }}>
+          Radar panel coming soon. Run scan from Task 19.
+        </p>
+      </aside>
     </div>
   );
 }

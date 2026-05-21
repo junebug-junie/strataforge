@@ -52,23 +52,72 @@ export interface TopicUpdatePatch {
   coverage?: Partial<CoverageFlags>;
 }
 
+export interface ProposalRecord {
+  id: string;
+  session_id: string;
+  topic_id: string | null;
+  kind: string;
+  state: string;
+  title: string;
+  summary: string;
+  rationale: string;
+  proposed_changes: Record<string, unknown>;
+  human_review: Record<string, unknown>;
+}
+
+export interface SessionDetail {
+  id: string;
+  project_id: string;
+  title: string;
+  topic_id: string | null;
+  mode: string;
+  current_gate: string;
+  created_at: string;
+  updated_at: string;
+  inputs: Record<string, unknown>;
+  proposals: ProposalRecord[];
+  outputs: Record<string, unknown>;
+}
+
+export interface ImportProposalsResult {
+  count: number;
+  proposals: ProposalRecord[];
+}
+
+export interface ApplySessionResult {
+  created: TopicRecord[];
+}
+
+async function apiFetch(url: string, init?: RequestInit): Promise<Response> {
+  const r = await fetch(url, init);
+  if (!r.ok) {
+    const text = await r.text();
+    let message = text;
+    try {
+      const parsed = JSON.parse(text) as { detail?: string };
+      if (parsed.detail) message = parsed.detail;
+    } catch {
+      // use raw text
+    }
+    throw new Error(message);
+  }
+  return r;
+}
+
 export async function listProjects(): Promise<ProjectSummary[]> {
-  const r = await fetch(`${API_BASE}/api/projects`);
-  if (!r.ok) throw new Error(await r.text());
+  const r = await apiFetch(`${API_BASE}/api/projects`);
   return r.json();
 }
 
 export async function listTopics(projectId: string): Promise<TopicNode[]> {
-  const r = await fetch(`${API_BASE}/api/projects/${encodeURIComponent(projectId)}/topics`);
-  if (!r.ok) throw new Error(await r.text());
+  const r = await apiFetch(`${API_BASE}/api/projects/${encodeURIComponent(projectId)}/topics`);
   return r.json();
 }
 
 export async function getTopic(projectId: string, topicId: string): Promise<TopicDetail> {
-  const r = await fetch(
+  const r = await apiFetch(
     `${API_BASE}/api/projects/${encodeURIComponent(projectId)}/topics/${encodeURIComponent(topicId)}`,
   );
-  if (!r.ok) throw new Error(await r.text());
   return r.json();
 }
 
@@ -84,7 +133,7 @@ export async function updateTopic(
   if (patch.coverage !== undefined) {
     body.coverage = { ...(currentCoverage ?? {}), ...patch.coverage };
   }
-  const r = await fetch(
+  const r = await apiFetch(
     `${API_BASE}/api/projects/${encodeURIComponent(projectId)}/topics/${encodeURIComponent(topicId)}`,
     {
       method: "PUT",
@@ -92,6 +141,103 @@ export async function updateTopic(
       body: JSON.stringify(body),
     },
   );
-  if (!r.ok) throw new Error(await r.text());
   return r.json();
+}
+
+export async function startSession(
+  projectId: string,
+  title: string,
+  mode = "intake",
+): Promise<SessionDetail> {
+  const r = await apiFetch(`${API_BASE}/api/projects/${encodeURIComponent(projectId)}/sessions`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ title, mode }),
+  });
+  return r.json();
+}
+
+export async function getSession(projectId: string, sessionId: string): Promise<SessionDetail> {
+  const r = await apiFetch(
+    `${API_BASE}/api/projects/${encodeURIComponent(projectId)}/sessions/${encodeURIComponent(sessionId)}`,
+  );
+  return r.json();
+}
+
+export async function updateSessionInputs(
+  projectId: string,
+  sessionId: string,
+  inputs: Record<string, unknown>,
+): Promise<SessionDetail> {
+  const r = await apiFetch(
+    `${API_BASE}/api/projects/${encodeURIComponent(projectId)}/sessions/${encodeURIComponent(sessionId)}`,
+    {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ inputs }),
+    },
+  );
+  return r.json();
+}
+
+export async function importProposals(
+  projectId: string,
+  sessionId: string,
+  bundle: Record<string, unknown>,
+): Promise<ImportProposalsResult> {
+  const r = await apiFetch(
+    `${API_BASE}/api/projects/${encodeURIComponent(projectId)}/sessions/${encodeURIComponent(sessionId)}/import`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(bundle),
+    },
+  );
+  return r.json();
+}
+
+export async function applySession(
+  projectId: string,
+  sessionId: string,
+  force = false,
+): Promise<ApplySessionResult> {
+  const query = force ? "?force=true" : "";
+  const r = await apiFetch(
+    `${API_BASE}/api/projects/${encodeURIComponent(projectId)}/sessions/${encodeURIComponent(sessionId)}/apply${query}`,
+    { method: "POST" },
+  );
+  return r.json();
+}
+
+async function proposalAction(
+  projectId: string,
+  proposalId: string,
+  action: "accept" | "reject" | "defer" | "out-of-scope",
+  note = "",
+): Promise<ProposalRecord> {
+  const r = await apiFetch(
+    `${API_BASE}/api/projects/${encodeURIComponent(projectId)}/proposals/${encodeURIComponent(proposalId)}/${action}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ note }),
+    },
+  );
+  return r.json();
+}
+
+export function acceptProposal(projectId: string, proposalId: string, note = "") {
+  return proposalAction(projectId, proposalId, "accept", note);
+}
+
+export function rejectProposal(projectId: string, proposalId: string, note = "") {
+  return proposalAction(projectId, proposalId, "reject", note);
+}
+
+export function deferProposal(projectId: string, proposalId: string, note = "") {
+  return proposalAction(projectId, proposalId, "defer", note);
+}
+
+export function outOfScopeProposal(projectId: string, proposalId: string, note = "") {
+  return proposalAction(projectId, proposalId, "out-of-scope", note);
 }

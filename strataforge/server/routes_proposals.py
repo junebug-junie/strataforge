@@ -57,3 +57,12 @@ def defer_proposal(
     body: ProposalActionRequest | None = None,
 ) -> dict:
     return _proposal_action(project_id, proposal_id, "defer", body or ProposalActionRequest())
+
+
+@router.post("/{proposal_id}/out-of-scope")
+def out_of_scope_proposal(
+    project_id: str,
+    proposal_id: str,
+    body: ProposalActionRequest | None = None,
+) -> dict:
+    return _proposal_action(project_id, proposal_id, "out-of-scope", body or ProposalActionRequest())
