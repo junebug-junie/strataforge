@@ -224,7 +224,7 @@ export async function applySession(
 async function proposalAction(
   projectId: string,
   proposalId: string,
-  action: "accept" | "reject" | "defer" | "out-of-scope",
+  action: "accept" | "reject" | "defer" | "out-of-scope" | "revise",
   note = "",
 ): Promise<ProposalRecord> {
   const r = await apiFetch(
@@ -252,6 +252,33 @@ export function deferProposal(projectId: string, proposalId: string, note = "") 
 
 export function outOfScopeProposal(projectId: string, proposalId: string, note = "") {
   return proposalAction(projectId, proposalId, "out-of-scope", note);
+}
+
+export function reviseProposal(projectId: string, proposalId: string, note = "") {
+  return proposalAction(projectId, proposalId, "revise", note);
+}
+
+export async function listSessions(
+  projectId: string,
+  mode?: string,
+): Promise<SessionDetail[]> {
+  const query = mode ? `?mode=${encodeURIComponent(mode)}` : "";
+  const r = await apiFetch(
+    `${API_BASE}/api/projects/${encodeURIComponent(projectId)}/sessions${query}`,
+  );
+  return r.json();
+}
+
+export async function getTopicPrompt(
+  projectId: string,
+  topicId: string,
+  command: "expand" | "reconcile-parent",
+): Promise<string> {
+  const r = await apiFetch(
+    `${API_BASE}/api/projects/${encodeURIComponent(projectId)}/topics/${encodeURIComponent(topicId)}/prompts/${command}`,
+  );
+  const data = (await r.json()) as { prompt: string };
+  return data.prompt;
 }
 
 export async function listRadar(projectId: string): Promise<RadarItem[]> {

@@ -3,6 +3,7 @@ import {
   applySession,
   getSession,
   importProposals,
+  listSessions,
   startSession,
   updateSessionInputs,
   type SessionDetail,
@@ -93,9 +94,11 @@ export default function SessionPanel({ projectId, onTopicsChanged }: SessionPane
       setLoading(true);
       setError(null);
       try {
-        const created = await startSession(projectId, "Intake", "intake");
+        const existing = await listSessions(projectId, "intake");
+        const sessionToLoad =
+          existing.length > 0 ? existing[0] : (await startSession(projectId, "Intake", "intake"));
         if (cancelled) return;
-        await loadSession(created.id);
+        await loadSession(sessionToLoad.id);
       } catch (err) {
         if (!cancelled) {
           setError(err instanceof Error ? err.message : "Failed to load session");
@@ -110,6 +113,21 @@ export default function SessionPanel({ projectId, onTopicsChanged }: SessionPane
       cancelled = true;
     };
   }, [projectId, loadSession]);
+
+  const handleStartNewSession = async () => {
+    setBusy(true);
+    setError(null);
+    setStatusMessage(null);
+    try {
+      const created = await startSession(projectId, "Intake", "intake");
+      await loadSession(created.id);
+      setStatusMessage("Started new intake session.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to start session");
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const scheduleSaveSourcePrompt = (value: string) => {
     setSourcePrompt(value);
@@ -190,10 +208,22 @@ export default function SessionPanel({ projectId, onTopicsChanged }: SessionPane
   return (
     <section style={{ textAlign: "left" }}>
       <header style={{ marginBottom: "12px" }}>
-        <h2 style={{ margin: "0 0 4px", fontSize: "16px", fontWeight: 600 }}>{session.title}</h2>
-        <p style={{ margin: 0, fontSize: "12px", color: "#6b7280" }}>
-          {session.id} · {session.mode}
-        </p>
+        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "8px" }}>
+          <div>
+            <h2 style={{ margin: "0 0 4px", fontSize: "16px", fontWeight: 600 }}>{session.title}</h2>
+            <p style={{ margin: 0, fontSize: "12px", color: "#6b7280" }}>
+              {session.id} · {session.mode}
+            </p>
+          </div>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void handleStartNewSession()}
+            style={{ padding: "4px 10px", fontSize: "12px", cursor: "pointer", flexShrink: 0 }}
+          >
+            New session
+          </button>
+        </div>
       </header>
 
       <div style={{ marginBottom: "14px" }}>

@@ -70,7 +70,19 @@ def create_topic_scaffold(
 
 def list_topics(paths: ProjectPaths) -> list[TopicRecord]:
     manifest = load_manifest(paths)
-    return manifest.topics
+    seen: dict[str, TopicRecord] = {}
+    for topic in manifest.root_areas + manifest.topics:
+        if topic.id not in seen:
+            seen[topic.id] = topic
+    result: list[TopicRecord] = []
+    for topic in seen.values():
+        file_path = paths.root / topic.path
+        if file_path.exists():
+            file_topic, _body = load_topic_file(file_path.read_text())
+            result.append(file_topic)
+        else:
+            result.append(topic)
+    return result
 
 def try_get_topic(paths: ProjectPaths, topic_id: str) -> TopicRecord | None:
     manifest = load_manifest(paths)

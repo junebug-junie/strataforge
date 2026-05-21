@@ -280,3 +280,65 @@ def test_proposal_reject_and_defer(tmp_path: Path, monkeypatch):
     )
     assert r_defer.status_code == 200
     assert r_defer.json()["state"] == "deferred"
+
+
+def test_list_sessions_and_unique_ids(tmp_path: Path, monkeypatch):
+    client = _client(tmp_path, monkeypatch)
+    created = client.post("/api/projects", json={"title": "P"}).json()
+    pid = created["project_id"]
+
+    first = client.post(f"/api/projects/{pid}/sessions", json={"title": "Intake", "mode": "intake"}).json()
+    second = client.post(f"/api/projects/{pid}/sessions", json={"title": "Intake", "mode": "intake"}).json()
+    assert first["id"] != second["id"]
+
+    listed = client.get(f"/api/projects/{pid}/sessions?mode=intake").json()
+    assert len(listed) == 2
+
+
+def test_import_proposals_invalid_returns_422(tmp_path: Path, monkeypatch):
+    client = _client(tmp_path, monkeypatch)
+    created = client.post("/api/projects", json={"title": "P"}).json()
+    pid = created["project_id"]
+    session = client.post(f"/api/projects/{pid}/sessions", json={"title": "S", "mode": "intake"}).json()
+    session_id = session["id"]
+
+    r = client.post(
+        f"/api/projects/{pid}/sessions/{session_id}/import",
+        json={"proposals": [{"title": "Missing kind"}]},
+    )
+    assert r.status_code == 422
+
+
+def test_proposal_revise(tmp_path: Path, monkeypatch):
+    client = _client(tmp_path, monkeypatch)
+    created = client.post("/api/projects", json={"title": "P"}).json()
+    pid = created["project_id"]
+    session = client.post(f"/api/projects/{pid}/sessions", json={"title": "S", "mode": "intake"}).json()
+    session_id = session["id"]
+
+    client.post(
+        f"/api/projects/{pid}/sessions/{session_id}/import",
+        json={
+            "proposals": [
+                {
+                    "kind": "create_component",
+                    "title": "A",
+                    "proposed_changes": {
+                        "area_slug": "01-a",
+                        "topic_id": "topic:a",
+                        "title": "A",
+                        "level": "area",
+                    },
+                }
+            ]
+        },
+    )
+    detail = client.get(f"/api/projects/{pid}/sessions/{session_id}").json()
+    proposal_id = detail["proposals"][0]["id"]
+
+    r = client.post(
+        f"/api/projects/{pid}/proposals/{proposal_id}/revise",
+        json={"note": "split needed"},
+    )
+    assert r.status_code == 200
+    assert r.json()["state"] == "revised"

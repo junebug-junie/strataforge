@@ -20,3 +20,22 @@ def test_validate_passes_clean_project(tmp_path: Path):
     create_topic_scaffold(paths, topic_id="topic:runtime.gates", title="Gates", area_slug="01-runtime", parent_id=parent.id, level="leaf")
     issues = validate_project(paths)
     assert issues == []
+
+
+def test_validate_catches_frontmatter_status_drift(tmp_path: Path):
+    root = tmp_path / "p"
+    init_project(root, "P")
+    paths = ProjectPaths(root)
+    create_topic_scaffold(
+        paths,
+        topic_id="topic:runtime",
+        title="Runtime",
+        area_slug="01-runtime",
+        parent_id=None,
+        level="area",
+    )
+    topic_path = paths.root / "areas/01-runtime/index.md"
+    text = topic_path.read_text().replace("status: scaffolded", "status: expanded")
+    topic_path.write_text(text)
+    issues = validate_project(paths)
+    assert any(i.code == "frontmatter_status_drift" for i in issues)

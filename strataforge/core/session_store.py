@@ -1,4 +1,5 @@
 import json
+import uuid
 from datetime import datetime
 from pathlib import Path
 
@@ -23,6 +24,35 @@ def _write_session_file(paths: ProjectPaths, session_id: str, data: dict) -> Non
     _session_path(paths, session_id).write_text(json.dumps(data, indent=2, default=str))
 
 
+def _session_slug(title: str, created_at: datetime) -> str:
+    title_part = title.lower().replace(" ", "-")[:40].strip("-")
+    time_part = created_at.strftime("%Y-%m-%dT%H%M%S")
+    unique_part = uuid.uuid4().hex[:8]
+    return f"{time_part}-{title_part}-{unique_part}"
+
+
+def list_sessions(paths: ProjectPaths) -> list[DesignSession]:
+    if not paths.sessions_dir.exists():
+        return []
+    sessions: list[DesignSession] = []
+    for path in sorted(paths.sessions_dir.glob("*.json")):
+        try:
+            data = json.loads(path.read_text())
+            session_data = {k: v for k, v in data.items() if k != PROPOSAL_RECORDS_KEY}
+            sessions.append(DesignSession.model_validate(session_data))
+        except (OSError, ValueError, KeyError):
+            continue
+    sessions.sort(key=lambda s: s.updated_at, reverse=True)
+    return sessions
+
+
+def find_latest_session(paths: ProjectPaths, *, mode: str | None = None) -> DesignSession | None:
+    for session in list_sessions(paths):
+        if mode is None or session.mode == mode:
+            return session
+    return None
+
+
 def create_session(
     paths: ProjectPaths,
     *,
@@ -31,7 +61,7 @@ def create_session(
     created_at: datetime,
     topic_id: str | None = None,
 ) -> DesignSession:
-    slug = created_at.date().isoformat() + "-" + title.lower().replace(" ", "-")[:40]
+    slug = _session_slug(title, created_at)
     session = DesignSession(
         id=f"session:{slug}",
         project_id=load_manifest(paths).project_id,

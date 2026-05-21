@@ -5,8 +5,8 @@ from pydantic import BaseModel, Field
 
 from strataforge.core.apply_engine import ApplyConflictError, apply_session
 from strataforge.core.proposal_store import add_proposal, load_proposal
-from strataforge.core.session_store import create_session, load_session, save_session
-from strataforge.llm.manual_import import parse_proposal_bundle
+from strataforge.core.session_store import create_session, list_sessions, load_session, save_session
+from strataforge.llm.manual_import import ProposalBundleError, parse_proposal_bundle
 from strataforge.server.deps import resolve_project_paths
 
 router = APIRouter(prefix="/api/projects/{project_id}/sessions", tags=["sessions"])
@@ -35,6 +35,15 @@ class ApplySessionResponse(BaseModel):
 
 class UpdateSessionRequest(BaseModel):
     inputs: dict[str, str | int | float | bool | None] = Field(default_factory=dict)
+
+
+@router.get("")
+def list_project_sessions(project_id: str, mode: str | None = None) -> list[dict]:
+    paths = resolve_project_paths(project_id)
+    sessions = list_sessions(paths)
+    if mode is not None:
+        sessions = [session for session in sessions if session.mode == mode]
+    return [session.model_dump(mode="json") for session in sessions]
 
 
 @router.post("", status_code=201)
@@ -95,7 +104,10 @@ def import_proposals(
     except (FileNotFoundError, KeyError, ValueError):
         raise HTTPException(status_code=404, detail=f"Session not found: {session_id}") from None
 
-    bundle = parse_proposal_bundle(body.model_dump())
+    try:
+        bundle = parse_proposal_bundle(body.model_dump())
+    except ProposalBundleError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     created: list[dict] = []
     for item in bundle["proposals"]:
         proposal = add_proposal(

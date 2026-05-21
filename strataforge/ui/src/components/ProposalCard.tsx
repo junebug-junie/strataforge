@@ -4,6 +4,7 @@ import {
   deferProposal,
   outOfScopeProposal,
   rejectProposal,
+  reviseProposal,
   type ProposalRecord,
 } from "../api";
 
@@ -28,7 +29,7 @@ export default function ProposalCard({ projectId, proposal, onUpdated }: Proposa
   const [error, setError] = useState<string | null>(null);
 
   const stateStyle = STATE_COLORS[proposal.state] ?? STATE_COLORS.proposed;
-  const isFinal = ["accepted", "rejected", "deferred", "out_of_scope", "promoted_to_scaffold"].includes(
+  const isFinal = ["accepted", "rejected", "deferred", "out_of_scope", "revised", "promoted_to_scaffold"].includes(
     proposal.state,
   );
 
@@ -115,6 +116,14 @@ export default function ProposalCard({ projectId, proposal, onUpdated }: Proposa
             style={{ padding: "4px 10px", fontSize: "12px", cursor: "pointer" }}
           >
             Out of scope
+          </button>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => runAction(() => reviseProposal(projectId, proposal.id))}
+            style={{ padding: "4px 10px", fontSize: "12px", cursor: "pointer" }}
+          >
+            Revise
           </button>
         </div>
       )}

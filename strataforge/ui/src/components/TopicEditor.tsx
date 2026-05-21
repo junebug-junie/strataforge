@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   getTopic,
+  getTopicPrompt,
   updateTopic,
   type CoverageFlags,
   type TopicDetail,
@@ -27,6 +28,7 @@ export default function TopicEditor({ projectId, topicId, onUpdated }: TopicEdit
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [promptMessage, setPromptMessage] = useState<string | null>(null);
   const [updating, setUpdating] = useState(false);
 
   const loadTopic = useCallback(() => {
@@ -80,6 +82,18 @@ export default function TopicEditor({ projectId, topicId, onUpdated }: TopicEdit
 
   const handleExecutionReady = () => {
     void applyUpdate({ status: "execution_ready" });
+  };
+
+  const copyPrompt = async (command: "expand" | "reconcile-parent", label: string) => {
+    setPromptMessage(null);
+    setActionError(null);
+    try {
+      const prompt = await getTopicPrompt(projectId, topicId, command);
+      await navigator.clipboard.writeText(prompt);
+      setPromptMessage(`${label} copied to clipboard.`);
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Failed to copy prompt");
+    }
   };
 
   if (loading) {
@@ -160,6 +174,31 @@ export default function TopicEditor({ projectId, topicId, onUpdated }: TopicEdit
         </div>
         {actionError && (
           <p style={{ margin: "8px 0 0", fontSize: "13px", color: "#b91c1c" }}>{actionError}</p>
+        )}
+      </section>
+
+      <section style={{ marginBottom: "16px" }}>
+        <h3 style={{ margin: "0 0 8px", fontSize: "14px", fontWeight: 600 }}>LLM prompts</h3>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+          <button
+            type="button"
+            disabled={updating}
+            onClick={() => void copyPrompt("expand", "Expansion prompt")}
+            style={{ padding: "6px 12px", fontSize: "13px", cursor: "pointer" }}
+          >
+            Copy expansion prompt
+          </button>
+          <button
+            type="button"
+            disabled={updating}
+            onClick={() => void copyPrompt("reconcile-parent", "Reconciliation prompt")}
+            style={{ padding: "6px 12px", fontSize: "13px", cursor: "pointer" }}
+          >
+            Copy reconcile prompt
+          </button>
+        </div>
+        {promptMessage && (
+          <p style={{ margin: "8px 0 0", fontSize: "13px", color: "#059669" }}>{promptMessage}</p>
         )}
       </section>
 
