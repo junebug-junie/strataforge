@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   createProject,
   listProjects,
@@ -25,6 +25,22 @@ export default function ProjectShell({ selectedTopicId, onSelectTopic }: Project
   const [showNewProject, setShowNewProject] = useState(false);
   const [newTitle, setNewTitle] = useState("");
   const [creating, setCreating] = useState(false);
+  const workspaceRef = useRef<HTMLDivElement>(null);
+
+  const handleSelectTopic = useCallback(
+    (topicId: string | null) => {
+      onSelectTopic(topicId);
+    },
+    [onSelectTopic],
+  );
+
+  useEffect(() => {
+    if (!selectedTopicId || !workspaceRef.current) return;
+    workspaceRef.current.scrollTop = 0;
+    requestAnimationFrame(() => {
+      workspaceRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    });
+  }, [selectedTopicId]);
 
   const loadProjects = useCallback(async () => {
     setLoading(true);
@@ -85,7 +101,7 @@ export default function ProjectShell({ selectedTopicId, onSelectTopic }: Project
 
   const handleProjectChange = (nextProjectId: string) => {
     setProjectId(nextProjectId);
-    onSelectTopic(null);
+    handleSelectTopic(null);
   };
 
   const handleProjectCreated = (project: ProjectSummary) => {
@@ -96,7 +112,7 @@ export default function ProjectShell({ selectedTopicId, onSelectTopic }: Project
     setProjectId(project.project_id);
     setShowNewProject(false);
     setNewTitle("");
-    onSelectTopic(null);
+    handleSelectTopic(null);
   };
 
   const handleCreateAnother = async () => {
@@ -194,27 +210,45 @@ export default function ProjectShell({ selectedTopicId, onSelectTopic }: Project
 
       <div className="app-body">
         <main className="app-main">
-          <section className="app-atlas">
-            <h2 style={{ margin: "0 0 8px", fontSize: "14px", fontWeight: 600 }}>Atlas</h2>
-            <p style={{ margin: "0 0 8px", fontSize: "12px", color: "#6b7280" }}>
-              {topics.length === 0
-                ? "No topics yet — complete intake and Apply session to populate the atlas."
-                : `${topics.length} topic(s) — click one to open the topic workspace.`}
-            </p>
+          <section className={`app-atlas${selectedTopicId ? " app-atlas--compact" : ""}`}>
+            <div className="app-atlas-header">
+              <h2>Atlas</h2>
+              {selectedTopicId && (
+                <button
+                  type="button"
+                  className="app-atlas-back"
+                  onClick={() => handleSelectTopic(null)}
+                >
+                  ← Intake session
+                </button>
+              )}
+            </div>
+            {!selectedTopicId && (
+              <p style={{ margin: "0 0 8px", fontSize: "12px", color: "#6b7280" }}>
+                {topics.length === 0
+                  ? "No topics yet — complete intake and Apply session to populate the atlas."
+                  : `${topics.length} topic(s) — select a topic to open its workspace.`}
+              </p>
+            )}
             <AtlasTree
               topics={topics}
               selectedTopicId={selectedTopicId}
-              onSelect={onSelectTopic}
+              onSelect={handleSelectTopic}
             />
           </section>
 
           {projectId && (
-            <PairingPlane
-              projectId={projectId}
-              selectedTopicId={selectedTopicId}
-              onTopicsChanged={refreshTopics}
-              onSelectTopic={onSelectTopic}
-            />
+            <div
+              ref={workspaceRef}
+              className={`app-main-body${selectedTopicId ? "" : " app-main-body--session"}`}
+            >
+              <PairingPlane
+                projectId={projectId}
+                selectedTopicId={selectedTopicId}
+                onTopicsChanged={refreshTopics}
+                onSelectTopic={handleSelectTopic}
+              />
+            </div>
           )}
         </main>
 
@@ -222,7 +256,7 @@ export default function ProjectShell({ selectedTopicId, onSelectTopic }: Project
           <aside className="app-radar">
             <CoherenceRadar
               projectId={projectId}
-              onSelectTopic={(topicId) => onSelectTopic(topicId)}
+              onSelectTopic={handleSelectTopic}
             />
           </aside>
         )}

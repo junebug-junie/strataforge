@@ -26,8 +26,8 @@ export default function PairingPlane({
         flex: 1,
         display: "flex",
         flexDirection: "column",
+        width: "100%",
         minWidth: 0,
-        borderRight: "1px solid #ddd",
         minHeight: 0,
         overflow: "hidden",
       }}
