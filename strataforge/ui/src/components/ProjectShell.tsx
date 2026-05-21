@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { listProjects, listTopics, type ProjectSummary, type TopicNode } from "../api";
 import AtlasTree from "./AtlasTree";
+import TopicEditor from "./TopicEditor";
 
 interface ProjectShellProps {
   selectedTopicId: string | null;
@@ -38,6 +39,13 @@ export default function ProjectShell({ selectedTopicId, onSelectTopic }: Project
       cancelled = true;
     };
   }, []);
+
+  const refreshTopics = useCallback(() => {
+    if (!projectId) return;
+    listTopics(projectId)
+      .then(setTopics)
+      .catch((err: Error) => setError(err.message));
+  }, [projectId]);
 
   useEffect(() => {
     if (!projectId) {
@@ -127,8 +135,12 @@ export default function ProjectShell({ selectedTopicId, onSelectTopic }: Project
         <h1 style={{ margin: "0 0 8px", fontSize: "20px" }}>
           {selectedProject?.title ?? "Project"}
         </h1>
-        {selectedTopicId ? (
-          <p style={{ color: "#444" }}>Selected topic: {selectedTopicId}</p>
+        {selectedTopicId && projectId ? (
+          <TopicEditor
+            projectId={projectId}
+            topicId={selectedTopicId}
+            onUpdated={refreshTopics}
+          />
         ) : (
           <p style={{ color: "#666" }}>Select a topic from the atlas tree.</p>
         )}
