@@ -99,3 +99,7 @@ def test_ui_session_resume_and_prompt_endpoints(tmp_path, monkeypatch):
         json={"proposals": [{"title": "no kind"}]},
     )
     assert bad_import.status_code == 422
+
+    context = client.get(f"/api/projects/{pid}/topics/topic:runtime/context")
+    assert context.status_code == 200
+    assert context.json()["topic"]["id"] == "topic:runtime"

@@ -47,6 +47,20 @@ export interface TopicDetail {
   body: string;
 }
 
+export interface TopicRef {
+  id: string;
+  title: string;
+}
+
+export interface TopicContext {
+  topic: TopicRef;
+  parent: TopicRef | null;
+  children: TopicRef[];
+  depends_on: TopicRef[];
+  feeds_into: TopicRef[];
+  blocks: TopicRef[];
+}
+
 export interface TopicUpdatePatch {
   review_state?: string;
   status?: string;
@@ -145,6 +159,13 @@ export async function listTopics(projectId: string): Promise<TopicNode[]> {
 export async function getTopic(projectId: string, topicId: string): Promise<TopicDetail> {
   const r = await apiFetch(
     `${API_BASE}/api/projects/${encodeURIComponent(projectId)}/topics/${encodeURIComponent(topicId)}`,
+  );
+  return r.json();
+}
+
+export async function getTopicContext(projectId: string, topicId: string): Promise<TopicContext> {
+  const r = await apiFetch(
+    `${API_BASE}/api/projects/${encodeURIComponent(projectId)}/topics/${encodeURIComponent(topicId)}/context`,
   );
   return r.json();
 }

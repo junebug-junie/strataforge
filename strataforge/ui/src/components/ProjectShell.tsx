@@ -199,7 +199,7 @@ export default function ProjectShell({ selectedTopicId, onSelectTopic }: Project
             <p style={{ margin: "0 0 8px", fontSize: "12px", color: "#6b7280" }}>
               {topics.length === 0
                 ? "No topics yet — complete intake and Apply session to populate the atlas."
-                : `${topics.length} topic(s) — click one to open it below.`}
+                : `${topics.length} topic(s) — click one to open the topic workspace.`}
             </p>
             <AtlasTree
               topics={topics}
