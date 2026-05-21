@@ -1,5 +1,6 @@
 import { useCallback, type CSSProperties } from "react";
 import { getTopicPrompt } from "../api";
+import { copyToClipboard } from "../lib/clipboard";
 import LocalGraph from "./LocalGraph";
 import TopicContextPanel from "./TopicContextPanel";
 import TopicEditor from "./TopicEditor";
@@ -23,22 +24,26 @@ export default function TopicWorkspace({
   const notify = useToast();
 
   const copyExpand = useCallback(async () => {
-    notify("Copying expansion prompt…", "info");
     try {
       const prompt = await getTopicPrompt(projectId, topicId, "expand");
-      await navigator.clipboard.writeText(prompt);
-      notify("Expansion prompt copied to clipboard.", "success");
+      const ok = await copyToClipboard(prompt);
+      notify(
+        ok ? "Expansion prompt copied to clipboard." : "Could not copy — check clipboard permissions.",
+        ok ? "success" : "error",
+      );
     } catch (err) {
       notify(err instanceof Error ? err.message : "Failed to copy prompt", "error");
     }
   }, [projectId, topicId, notify]);
 
   const copyReconcile = useCallback(async () => {
-    notify("Copying reconciliation prompt…", "info");
     try {
       const prompt = await getTopicPrompt(projectId, topicId, "reconcile-parent");
-      await navigator.clipboard.writeText(prompt);
-      notify("Reconciliation prompt copied to clipboard.", "success");
+      const ok = await copyToClipboard(prompt);
+      notify(
+        ok ? "Reconciliation prompt copied to clipboard." : "Could not copy — check clipboard permissions.",
+        ok ? "success" : "error",
+      );
     } catch (err) {
       notify(err instanceof Error ? err.message : "Failed to copy prompt", "error");
     }
@@ -65,7 +70,7 @@ export default function TopicWorkspace({
         <span style={{ fontSize: "12px", color: "#6b7280", alignSelf: "center", marginRight: "4px" }}>
           Next actions
         </span>
-        <button type="button" onClick={() => void copyExpand()} style={actionBtnStyle}>
+        <button type="button" data-testid="action-expand" onClick={() => void copyExpand()} style={actionBtnStyle}>
           Expand
         </button>
         <button
@@ -86,7 +91,7 @@ export default function TopicWorkspace({
         >
           Add link
         </button>
-        <button type="button" onClick={() => void copyReconcile()} style={actionBtnStyle}>
+        <button type="button" data-testid="action-boundary" onClick={() => void copyReconcile()} style={actionBtnStyle}>
           Boundary check
         </button>
       </div>

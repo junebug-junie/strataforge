@@ -111,6 +111,7 @@ export default function AtlasTree({ topics, selectedTopicId, onSelect }: AtlasTr
             <li key={node.id}>
               <button
                 type="button"
+                data-testid={`atlas-topic-${node.id}`}
                 onClick={() => onSelect(node.id)}
                 style={{
                   padding: "6px 12px",

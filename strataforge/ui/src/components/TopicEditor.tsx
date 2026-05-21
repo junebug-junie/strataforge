@@ -6,6 +6,8 @@ import {
   type CoverageFlags,
   type TopicDetail,
 } from "../api";
+import { copyToClipboard } from "../lib/clipboard";
+import { advanceStatusLabel, nextDesignStatus } from "../lib/status";
 import { useToast } from "./Toast";
 
 const COVERAGE_FLAGS: { key: keyof CoverageFlags; label: string }[] = [
@@ -80,36 +82,48 @@ export default function TopicEditor({ projectId, topicId, onUpdated }: TopicEdit
     }
 
     const label = COVERAGE_FLAGS.find((f) => f.key === key)?.label ?? key;
-    notify(`${nextVal ? "Set" : "Cleared"} ${label}.`, "info");
-    void applyUpdate(patch, detail.topic.coverage).then(() => {
-      notify(`${label} ${nextVal ? "on" : "off"}.`, "success");
-    });
+    void (async () => {
+      try {
+        await applyUpdate(patch, detail.topic.coverage);
+        notify(`${label} ${nextVal ? "on" : "off"}.`, "success");
+      } catch {
+        // applyUpdate already toasts errors
+      }
+    })();
   };
 
-  const handleExecutionReady = () => {
+  const handleAdvanceStatus = () => {
     if (!detail) {
       notify(loading ? "Still loading topic…" : "Topic not loaded yet", "error");
       return;
     }
-    if (detail.topic.status === "execution_ready") {
-      notify("Already execution ready (status is one-way in MVP).", "info");
+    const next = nextDesignStatus(detail.topic.status);
+    if (!next) {
+      notify("Already at execution ready (MVP chain ends here).", "info");
       return;
     }
-    notify("Promoting to execution ready…", "info");
-    void applyUpdate({ status: "execution_ready" }, detail.topic.coverage).then(() => {
-      notify("Status set to execution ready.", "success");
-    });
+    void (async () => {
+      try {
+        await applyUpdate({ status: next }, detail.topic.coverage);
+        notify(`Status advanced to ${next.replace("_", " ")}.`, "success");
+      } catch {
+        // applyUpdate already toasts errors
+      }
+    })();
   };
 
   const copyPrompt = async (command: "expand" | "reconcile-parent", label: string) => {
     setPromptMessage(null);
     setActionError(null);
-    notify(`Copying ${label.toLowerCase()}…`, "info");
     try {
       const prompt = await getTopicPrompt(projectId, topicId, command);
-      await navigator.clipboard.writeText(prompt);
-      setPromptMessage(`${label} copied to clipboard.`);
-      notify(`${label} copied to clipboard.`, "success");
+      const ok = await copyToClipboard(prompt);
+      if (ok) {
+        setPromptMessage(`${label} copied to clipboard.`);
+        notify(`${label} copied to clipboard.`, "success");
+      } else {
+        notify("Could not copy — check browser clipboard permissions.", "error");
+      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to copy prompt";
       setActionError(msg);
@@ -159,6 +173,7 @@ export default function TopicEditor({ projectId, topicId, onUpdated }: TopicEdit
                 type="button"
                 disabled={updating}
                 aria-pressed={active}
+                data-testid={`coverage-${key}`}
                 title={active ? `Clear ${label}` : `Set ${label}`}
                 onClick={() => toggleCoverage(key)}
                 style={{
@@ -185,13 +200,17 @@ export default function TopicEditor({ projectId, topicId, onUpdated }: TopicEdit
 
       <section style={{ marginBottom: "16px" }}>
         <h3 style={{ margin: "0 0 8px", fontSize: "14px", fontWeight: 600 }}>Status promotion</h3>
+        <p style={{ margin: "0 0 8px", fontSize: "12px", color: "#6b7280" }}>
+          scaffolded → expanded → reconciled → execution ready (one step per click)
+        </p>
         <button
           type="button"
-          disabled={updating || topic.status === "execution_ready"}
-          onClick={handleExecutionReady}
+          data-testid="advance-status"
+          disabled={updating || nextDesignStatus(topic.status) === null}
+          onClick={handleAdvanceStatus}
           style={{ padding: "6px 12px", fontSize: "13px", cursor: "pointer" }}
         >
-          {topic.status === "execution_ready" ? "Execution ready ✓" : "Mark execution ready"}
+          {advanceStatusLabel(topic.status)}
         </button>
       </section>
 
@@ -200,6 +219,7 @@ export default function TopicEditor({ projectId, topicId, onUpdated }: TopicEdit
         <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
           <button
             type="button"
+            data-testid="copy-expand-prompt"
             disabled={updating}
             onClick={() => void copyPrompt("expand", "Expansion prompt")}
             style={{ padding: "6px 12px", fontSize: "13px", cursor: "pointer" }}
@@ -208,6 +228,7 @@ export default function TopicEditor({ projectId, topicId, onUpdated }: TopicEdit
           </button>
           <button
             type="button"
+            data-testid="copy-reconcile-prompt"
             disabled={updating}
             onClick={() => void copyPrompt("reconcile-parent", "Reconciliation prompt")}
             style={{ padding: "6px 12px", fontSize: "13px", cursor: "pointer" }}
