@@ -70,7 +70,7 @@ def _run_prompt(prompt: str, command: str, *, json_mode: bool = False) -> LlmRun
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except LLMCompletionError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
-    return LlmRunResponse(text=text, model=settings.openai_model, command=command)
+    return LlmRunResponse(text=text, model=str(llm_status()["model"]), command=command)
 
 
 def _pipeline_response(result) -> LlmRunResponse:
