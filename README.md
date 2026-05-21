@@ -29,9 +29,9 @@ docker compose up --build
 sudo tailscale serve --bg --https=443 --set-path=/strataforge http://127.0.0.1:8788
 ```
 
-Open: `https://<your-tailscale-host>/strataforge/`
+Open: `https://<your-tailscale-host>/strataforge/` (note trailing slash)
 
-The React app uses relative API calls (`/strataforge/api/...`), so it works on any Tailscale MagicDNS name without rebuilding for a specific hostname.
+Tailscale strips the `/strataforge` prefix before forwarding to port 8788, so nginx serves the app at `/` internally while the browser still requests assets at `/strataforge/assets/...`.
 
 To remove later: `sudo tailscale serve reset` (or `tailscale serve status` to inspect).
 
