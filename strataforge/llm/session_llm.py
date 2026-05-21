@@ -12,7 +12,7 @@ from strataforge.core.status import ProposalState
 from strataforge.core.session_store import load_session
 from strataforge.llm.manual_import import ProposalBundleError, parse_llm_paste_text, parse_proposal_bundle
 from strataforge.llm.prompts import build_decompose_prompt, build_intake_prompt, build_link_prompt
-from strataforge.llm.providers import complete_text
+from strataforge.llm.providers import complete_text, llm_status
 from strataforge.llm.schemas import PROPOSAL_BUNDLE_JSON_HINT
 
 
@@ -113,13 +113,11 @@ def run_session_llm_pipeline(
     apply: bool = False,
     structured: bool = True,
 ) -> SessionLlmResult:
-    from strataforge.config import settings
-
     prompt = _build_session_prompt(paths, session_id, command, source_prompt)
     text = complete_text(prompt, json_mode=structured)
     result = SessionLlmResult(
         text=text,
-        model=settings.openai_model,
+        model=str(llm_status()["model"]),
         command=command,
         imported=False,
         proposal_count=0,

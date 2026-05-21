@@ -62,8 +62,6 @@ def get_llm_status() -> LlmStatusResponse:
 
 
 def _run_prompt(prompt: str, command: str, *, json_mode: bool = False) -> LlmRunResponse:
-    from strataforge.config import settings
-
     try:
         text = complete_text(prompt, json_mode=json_mode)
     except LLMNotConfiguredError as exc:

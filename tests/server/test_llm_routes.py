@@ -30,7 +30,7 @@ def test_run_session_llm_not_configured(monkeypatch):
     assert r.status_code in (404, 503)
 
 
-def test_run_session_llm_mocked(client, monkeypatch, tmp_path):
+def test_run_session_llm_mocked(client, monkeypatch, tmp_path, mock_httpx_client):
     from datetime import datetime, timezone
 
     from strataforge.core.manifest import init_project
@@ -52,20 +52,7 @@ def test_run_session_llm_mocked(client, monkeypatch, tmp_path):
             json={"choices": [{"message": {"content": '{"session_mode":"intake","proposals":[]}'}}]},
         )
 
-    transport = httpx.MockTransport(handler)
-    real_client = httpx.Client
-
-    class _ClientCtx:
-        def __init__(self, timeout: float = 180.0):
-            self._inner = real_client(transport=transport, timeout=timeout)
-
-        def __enter__(self):
-            return self._inner
-
-        def __exit__(self, *args):
-            self._inner.close()
-
-    monkeypatch.setattr("strataforge.llm.providers.httpx.Client", _ClientCtx)
+    mock_httpx_client(handler)
 
     r = client.post(
         f"/api/projects/{manifest.project_id}/sessions/{session.id}/llm/run",

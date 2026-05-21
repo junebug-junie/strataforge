@@ -34,7 +34,7 @@ def test_complete_text_raises_when_not_configured(monkeypatch):
         complete_text("hello")
 
 
-def test_complete_text_parses_openai_response(monkeypatch):
+def test_complete_text_parses_openai_response(monkeypatch, mock_httpx_client):
     monkeypatch.setattr(settings, "strata_llm_provider", "openai")
     monkeypatch.setattr(settings, "openai_api_key", "sk-test")
     monkeypatch.setattr(settings, "openai_base_url", "https://api.example.com/v1")
@@ -48,20 +48,7 @@ def test_complete_text_parses_openai_response(monkeypatch):
             json={"choices": [{"message": {"content": '{"session_mode":"intake"}'}}]},
         )
 
-    transport = httpx.MockTransport(handler)
-    real_client = httpx.Client
-
-    class _ClientCtx:
-        def __init__(self, timeout: float = 180.0):
-            self._inner = real_client(transport=transport, timeout=timeout)
-
-        def __enter__(self):
-            return self._inner
-
-        def __exit__(self, *args):
-            self._inner.close()
-
-    monkeypatch.setattr("strataforge.llm.providers.httpx.Client", _ClientCtx)
+    mock_httpx_client(handler)
     assert complete_text("prompt") == '{"session_mode":"intake"}'
 
 
