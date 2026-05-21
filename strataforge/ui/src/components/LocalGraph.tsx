@@ -3,6 +3,7 @@ import {
   Background,
   Controls,
   ReactFlow,
+  ReactFlowProvider,
   type Edge,
   type Node,
   Position,
@@ -150,23 +151,25 @@ export default function LocalGraph({ projectId, topicId, onSelectTopic }: LocalG
   }
 
   return (
-    <div style={{ width: "100%", height: "200px" }}>
-      <ReactFlow
-        nodes={nodes}
-        edges={edges}
-        fitView
-        fitViewOptions={{ padding: 0.2 }}
-        nodesDraggable={false}
-        nodesConnectable={false}
-        elementsSelectable={false}
-        panOnDrag
-        zoomOnScroll
-        onNodeClick={(_e, node) => onSelectTopic(node.id)}
-        proOptions={{ hideAttribution: true }}
-      >
-        <Background gap={12} size={1} />
-        <Controls showInteractive={false} />
-      </ReactFlow>
+    <div style={{ width: "100%", height: "100%", minHeight: "180px" }}>
+      <ReactFlowProvider>
+        <ReactFlow
+          nodes={nodes}
+          edges={edges}
+          fitView
+          fitViewOptions={{ padding: 0.2 }}
+          nodesDraggable={false}
+          nodesConnectable={false}
+          elementsSelectable={false}
+          panOnDrag
+          zoomOnScroll
+          onNodeClick={(_e, node) => onSelectTopic(node.id)}
+          proOptions={{ hideAttribution: true }}
+        >
+          <Background gap={12} size={1} />
+          <Controls showInteractive={false} />
+        </ReactFlow>
+      </ReactFlowProvider>
     </div>
   );
 }

@@ -37,9 +37,6 @@ export default function ProjectShell({ selectedTopicId, onSelectTopic }: Project
   useEffect(() => {
     if (!selectedTopicId || !workspaceRef.current) return;
     workspaceRef.current.scrollTop = 0;
-    requestAnimationFrame(() => {
-      workspaceRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
-    });
   }, [selectedTopicId]);
 
   const loadProjects = useCallback(async () => {
@@ -94,10 +91,11 @@ export default function ProjectShell({ selectedTopicId, onSelectTopic }: Project
   }, [projectId]);
 
   useEffect(() => {
-    if (selectedTopicId && !topics.some((t) => t.id === selectedTopicId)) {
-      onSelectTopic(null);
+    if (!selectedTopicId || topics.length === 0) return;
+    if (!topics.some((t) => t.id === selectedTopicId)) {
+      handleSelectTopic(null);
     }
-  }, [topics, selectedTopicId, onSelectTopic]);
+  }, [topics, selectedTopicId, handleSelectTopic]);
 
   const handleProjectChange = (nextProjectId: string) => {
     setProjectId(nextProjectId);
@@ -137,6 +135,8 @@ export default function ProjectShell({ selectedTopicId, onSelectTopic }: Project
   if (projects.length === 0) {
     return <ProjectOnboarding onCreated={handleProjectCreated} />;
   }
+
+  const selectedTopic = topics.find((t) => t.id === selectedTopicId);
 
   return (
     <div className="app-shell">
@@ -240,11 +240,12 @@ export default function ProjectShell({ selectedTopicId, onSelectTopic }: Project
           {projectId && (
             <div
               ref={workspaceRef}
-              className={`app-main-body${selectedTopicId ? "" : " app-main-body--session"}`}
+              className={`app-main-body${selectedTopicId ? " app-main-body--focus" : " app-main-body--session"}`}
             >
               <PairingPlane
                 projectId={projectId}
                 selectedTopicId={selectedTopicId}
+                selectedTopicTitle={selectedTopic?.title ?? null}
                 onTopicsChanged={refreshTopics}
                 onSelectTopic={handleSelectTopic}
               />

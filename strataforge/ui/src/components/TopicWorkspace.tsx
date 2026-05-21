@@ -1,5 +1,6 @@
 import { useCallback, useState, type CSSProperties } from "react";
 import { getTopicPrompt } from "../api";
+import ErrorBoundary from "./ErrorBoundary";
 import LocalGraph from "./LocalGraph";
 import TopicContextPanel from "./TopicContextPanel";
 import TopicEditor from "./TopicEditor";
@@ -7,6 +8,7 @@ import TopicEditor from "./TopicEditor";
 interface TopicWorkspaceProps {
   projectId: string;
   topicId: string;
+  topicTitle: string;
   onUpdated: () => void;
   onSelectTopic: (topicId: string) => void;
 }
@@ -14,6 +16,7 @@ interface TopicWorkspaceProps {
 export default function TopicWorkspace({
   projectId,
   topicId,
+  topicTitle,
   onUpdated,
   onSelectTopic,
 }: TopicWorkspaceProps) {
@@ -38,7 +41,13 @@ export default function TopicWorkspace({
   };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
+    <div className="topic-workspace" style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
+      <header className="topic-workspace-header">
+        <h2 className="topic-workspace-title">{topicTitle}</h2>
+        <p className="topic-workspace-subtitle">
+          Topic workspace · <code style={{ fontSize: "11px" }}>{topicId}</code>
+        </p>
+      </header>
       <div
         style={{
           display: "flex",
@@ -93,12 +102,20 @@ export default function TopicWorkspace({
           <div style={{ padding: "8px 12px", borderBottom: "1px solid #eee", fontSize: "12px", fontWeight: 600 }}>
             Local graph (1-hop)
           </div>
-          <div style={{ flex: 1, minHeight: "200px" }}>
-            <LocalGraph
-              projectId={projectId}
-              topicId={topicId}
-              onSelectTopic={onSelectTopic}
-            />
+          <div className="topic-workspace-graph" style={{ flex: 1, minHeight: "180px" }}>
+            <ErrorBoundary
+              fallback={
+                <p style={{ margin: 0, padding: "12px", fontSize: "12px", color: "#6b7280" }}>
+                  Graph unavailable — structure panel below still works.
+                </p>
+              }
+            >
+              <LocalGraph
+                projectId={projectId}
+                topicId={topicId}
+                onSelectTopic={onSelectTopic}
+              />
+            </ErrorBoundary>
           </div>
           <TopicContextPanel
             projectId={projectId}

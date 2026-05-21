@@ -7,6 +7,7 @@ export type PairingViewMode = "atlas-only" | "topic-focus" | "session-focus";
 interface PairingPlaneProps {
   projectId: string;
   selectedTopicId: string | null;
+  selectedTopicTitle: string | null;
   onTopicsChanged: () => void;
   onSelectTopic: (topicId: string) => void;
 }
@@ -14,6 +15,7 @@ interface PairingPlaneProps {
 export default function PairingPlane({
   projectId,
   selectedTopicId,
+  selectedTopicTitle,
   onTopicsChanged,
   onSelectTopic,
 }: PairingPlaneProps) {
@@ -34,8 +36,10 @@ export default function PairingPlane({
     >
       {viewMode === "topic-focus" && selectedTopicId && (
         <TopicWorkspace
+          key={selectedTopicId}
           projectId={projectId}
           topicId={selectedTopicId}
+          topicTitle={selectedTopicTitle ?? selectedTopicId}
           onUpdated={onTopicsChanged}
           onSelectTopic={onSelectTopic}
         />
