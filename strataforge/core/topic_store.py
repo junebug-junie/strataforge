@@ -115,23 +115,7 @@ def _sync_manifest_topic(manifest: ProjectManifest, topic: TopicRecord) -> None:
             return
 
 
-def update_topic(
-    paths: ProjectPaths,
-    topic_id: str,
-    *,
-    review_state: ReviewState | None = None,
-    status: DesignStatus | None = None,
-    coverage: CoverageFlags | None = None,
-) -> TopicRecord:
-    from strataforge.core.status import assert_status_promotion_allowed
-    topic, body = get_topic(paths, topic_id)
-    if status is not None and status != topic.status:
-        assert_status_promotion_allowed(topic.status, status)
-        topic.status = status
-    if review_state is not None:
-        topic.review_state = review_state
-    if coverage is not None:
-        topic.coverage = coverage
+def _persist_topic(paths: ProjectPaths, topic: TopicRecord, body: str) -> TopicRecord:
     topic.updated_at = date.today()
     file_path = paths.root / topic.path
     file_path.write_text(dump_topic_file(topic, body))
@@ -139,3 +123,43 @@ def update_topic(
     _sync_manifest_topic(manifest, topic)
     save_manifest(paths, manifest)
     return topic
+
+
+def append_topic_link(
+    paths: ProjectPaths,
+    topic_id: str,
+    *,
+    depends_on_id: str | None = None,
+    feeds_into_id: str | None = None,
+    blocks_id: str | None = None,
+) -> TopicRecord:
+    topic, body = get_topic(paths, topic_id)
+    if depends_on_id and depends_on_id not in topic.depends_on:
+        topic.depends_on = [*topic.depends_on, depends_on_id]
+    if feeds_into_id and feeds_into_id not in topic.feeds_into:
+        topic.feeds_into = [*topic.feeds_into, feeds_into_id]
+    if blocks_id and blocks_id not in topic.blocks:
+        topic.blocks = [*topic.blocks, blocks_id]
+    return _persist_topic(paths, topic, body)
+
+
+def update_topic(
+    paths: ProjectPaths,
+    topic_id: str,
+    *,
+    review_state: ReviewState | None = None,
+    status: DesignStatus | None = None,
+    coverage: CoverageFlags | None = None,
+    body: str | None = None,
+) -> TopicRecord:
+    from strataforge.core.status import assert_status_promotion_allowed
+    topic, existing_body = get_topic(paths, topic_id)
+    if status is not None and status != topic.status:
+        assert_status_promotion_allowed(topic.status, status)
+        topic.status = status
+    if review_state is not None:
+        topic.review_state = review_state
+    if coverage is not None:
+        topic.coverage = coverage
+    markdown = body if body is not None else existing_body
+    return _persist_topic(paths, topic, markdown)

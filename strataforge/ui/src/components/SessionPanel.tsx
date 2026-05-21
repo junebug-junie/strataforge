@@ -10,56 +10,18 @@ import {
   updateSessionInputs,
   type SessionDetail,
 } from "../api";
+import { INTAKE_WORKFLOW } from "../workflowGuides";
 import { SAMPLE_INTAKE_BUNDLE } from "../sampleIntakeBundle";
+import SessionLlmToolbar from "./SessionLlmToolbar";
 import ProposalCard from "./ProposalCard";
-
-function extractJsonFromLlmPaste(text: string): Record<string, unknown> {
-  const trimmed = text.trim();
-  if (!trimmed) throw new Error("Paste is empty");
-
-  try {
-    const parsed: unknown = JSON.parse(trimmed);
-    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-      return parsed as Record<string, unknown>;
-    }
-  } catch {
-    // fall through
-  }
-
-  const fence = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i);
-  if (fence) {
-    const parsed: unknown = JSON.parse(fence[1].trim());
-    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-      return parsed as Record<string, unknown>;
-    }
-  }
-
-  const start = trimmed.indexOf("{");
-  const end = trimmed.lastIndexOf("}");
-  if (start >= 0 && end > start) {
-    const parsed: unknown = JSON.parse(trimmed.slice(start, end + 1));
-    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-      return parsed as Record<string, unknown>;
-    }
-  }
-
-  throw new Error(
-    "Could not find a JSON object. Paste the LLM's answer, not the prompt you sent it.",
-  );
-}
+import { useToast } from "./Toast";
+import WorkflowCallout, { SectionPhaseHint } from "./WorkflowCallout";
 
 interface SessionPanelProps {
   projectId: string;
   onTopicsChanged: () => void;
   onSelectTopic: (topicId: string) => void;
 }
-
-const STEPS = [
-  "Describe your architecture idea",
-  "Copy the augmented prompt below → paste into ChatGPT/Claude",
-  "Copy the LLM's entire reply back here (```json fences are OK)",
-  "Accept proposals, then Apply session",
-];
 
 export default function SessionPanel({
   projectId,
@@ -79,6 +41,7 @@ export default function SessionPanel({
   const [busy, setBusy] = useState(false);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const promptTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const notify = useToast();
 
   const loadSession = useCallback(async (sessionId: string) => {
     const detail = await getSession(projectId, sessionId);
@@ -261,11 +224,11 @@ export default function SessionPanel({
   };
 
   if (loading) {
-    return <p style={{ color: "#666", fontSize: "13px" }}>Starting session…</p>;
+    return <p className="sf-muted">Starting session…</p>;
   }
 
   if (error && !session) {
-    return <p style={{ color: "#b91c1c", fontSize: "13px" }}>{error}</p>;
+    return <p className="sf-error-text">{error}</p>;
   }
 
   if (!session) {
@@ -273,208 +236,159 @@ export default function SessionPanel({
   }
 
   return (
-    <section style={{ textAlign: "left" }}>
-      <header style={{ marginBottom: "12px" }}>
-        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "8px" }}>
-          <div>
-            <h2 style={{ margin: "0 0 4px", fontSize: "16px", fontWeight: 600 }}>{session.title}</h2>
-            <p style={{ margin: 0, fontSize: "12px", color: "#6b7280" }}>
-              {session.id} · {session.mode}
-            </p>
-          </div>
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => void handleStartNewSession()}
-            style={{ padding: "4px 10px", fontSize: "12px", cursor: "pointer", flexShrink: 0 }}
-          >
-            New session
-          </button>
+    <section className="session-panel sf-panel">
+      <header className="session-panel__header">
+        <div>
+          <h2 className="session-panel__title">{session.title}</h2>
+          <p className="session-panel__meta">
+            {session.id} · {session.mode}
+          </p>
         </div>
-      </header>
-
-      <ol
-        style={{
-          margin: "0 0 16px",
-          padding: "12px 12px 12px 28px",
-          fontSize: "12px",
-          color: "#4b5563",
-          background: "#f3f4f6",
-          borderRadius: "8px",
-          lineHeight: 1.5,
-        }}
-      >
-        {STEPS.map((step) => (
-          <li key={step} style={{ marginBottom: "4px" }}>
-            {step}
-          </li>
-        ))}
-      </ol>
-
-      <div
-        style={{
-          marginBottom: "16px",
-          padding: "12px",
-          background: "#eff6ff",
-          border: "1px solid #bfdbfe",
-          borderRadius: "8px",
-        }}
-      >
-        <p style={{ margin: "0 0 8px", fontSize: "13px", fontWeight: 600, color: "#1e3a8a" }}>
-          New here?
-        </p>
         <button
           type="button"
+          className="btn"
+          disabled={busy}
+          onClick={() => void handleStartNewSession()}
+        >
+          New session
+        </button>
+      </header>
+
+      <WorkflowCallout
+        testId="workflow-intake"
+        title="Intake workflow (manual LLM pairing)"
+        summary="Manual paste always works. With OPENAI_API_KEY set, use Run with LLM to fill the paste area — you still Import, gate proposals, and Apply before anything hits disk."
+        steps={INTAKE_WORKFLOW}
+      />
+
+      <div className="session-callout">
+        <p className="session-callout__title">New here?</p>
+        <button
+          type="button"
+          className="btn btn--primary"
           disabled={busy}
           onClick={() => void handleRunSampleDemo()}
-          style={{
-            padding: "8px 12px",
-            fontSize: "13px",
-            fontWeight: 600,
-            cursor: busy ? "wait" : "pointer",
-            background: "#1e40af",
-            color: "#fff",
-            border: "none",
-            borderRadius: "6px",
-          }}
         >
           Run sample demo (import → accept → apply)
         </button>
-        <p style={{ margin: "8px 0 0", fontSize: "12px", color: "#1e40af" }}>
+        <p className="sf-hint" style={{ marginTop: "8px" }}>
           Populates the atlas tree instantly with two sample areas.
         </p>
       </div>
 
-      <div style={{ marginBottom: "14px" }}>
-        <label htmlFor="source-prompt" style={{ display: "block", fontSize: "13px", fontWeight: 600 }}>
-          1. Architecture idea
-        </label>
+      <div className="session-field">
+        <div className="session-field__label-row">
+          <label className="sf-section-title" htmlFor="source-prompt" style={{ margin: 0 }}>
+            1. Architecture idea
+          </label>
+          <SectionPhaseHint phase="strataforge" />
+        </div>
         <textarea
           id="source-prompt"
+          className="sf-textarea"
           value={sourcePrompt}
           onChange={(e) => scheduleSaveSourcePrompt(e.target.value)}
           rows={3}
           placeholder="Describe the architecture you want to decompose…"
-          style={{
-            width: "100%",
-            marginTop: "6px",
-            padding: "8px",
-            fontSize: "13px",
-            fontFamily: "inherit",
-            boxSizing: "border-box",
-          }}
+          style={{ fontFamily: "inherit", marginTop: "6px" }}
         />
-        <label htmlFor="augmented-prompt" style={{ display: "block", fontSize: "13px", fontWeight: 600, marginTop: "14px" }}>
-          2. Augmented prompt (for external LLM)
-        </label>
-        <p style={{ margin: "4px 0 0", fontSize: "12px", color: "#6b7280" }}>
+        <div className="session-field__label-row" style={{ marginTop: "14px" }}>
+          <label className="sf-section-title" htmlFor="augmented-prompt" style={{ margin: 0 }}>
+            2. Augmented prompt
+          </label>
+          <SectionPhaseHint phase="strataforge" text="copy from here" />
+          <SectionPhaseHint phase="external" text="paste in LLM" />
+        </div>
+        <p className="sf-hint">
           Includes your idea, project context, existing atlas areas, and strict JSON-only output rules.
         </p>
         <textarea
           id="augmented-prompt"
+          className="sf-textarea"
           readOnly
           value={promptLoading ? "Building augmented prompt…" : augmentedPrompt}
           rows={12}
-          style={{
-            width: "100%",
-            marginTop: "6px",
-            padding: "8px",
-            fontSize: "12px",
-            fontFamily: "monospace",
-            boxSizing: "border-box",
-            background: "#f9fafb",
-            color: "#374151",
-          }}
+          style={{ marginTop: "6px", background: "var(--sf-surface-2)" }}
         />
-        <div style={{ display: "flex", gap: "8px", marginTop: "8px", flexWrap: "wrap" }}>
+        <div className="btn-group" style={{ marginTop: "8px" }}>
           <button
             type="button"
+            className="btn"
             disabled={!augmentedPrompt || promptLoading}
             onClick={() => void handleCopyIntakePrompt()}
-            style={{ padding: "6px 12px", fontSize: "13px", cursor: "pointer" }}
           >
             Copy augmented prompt
           </button>
         </div>
         {copyMessage && (
-          <p style={{ margin: "6px 0 0", fontSize: "12px", color: "#059669" }}>{copyMessage}</p>
+          <p style={{ margin: "6px 0 0", fontSize: "12px", color: "var(--sf-success)" }}>{copyMessage}</p>
         )}
       </div>
 
-      <div style={{ marginBottom: "14px" }}>
-        <label htmlFor="proposal-json" style={{ display: "block", fontSize: "13px", fontWeight: 600 }}>
-          3. Paste the LLM&apos;s reply
-        </label>
-        <p style={{ margin: "4px 0 0", fontSize: "12px", color: "#6b7280" }}>
-          Copy the LLM&apos;s whole answer here — the prompt tells it to respond with JSON only.
-          If it wraps output in ```json fences anyway, that&apos;s fine.
+      <div className="session-field">
+        <div className="session-field__label-row">
+          <label className="sf-section-title" htmlFor="proposal-json" style={{ margin: 0 }}>
+            3. Paste the LLM&apos;s reply
+          </label>
+          <SectionPhaseHint phase="return" text="paste JSON here" />
+        </div>
+        <p className="sf-hint">
+          Use Run &amp; import below (structured JSON), or paste manually.
         </p>
+        {session && (
+          <SessionLlmToolbar
+            projectId={projectId}
+            sessionId={session.id}
+            command="intake"
+            session={session}
+            sourcePrompt={sourcePrompt}
+            busy={busy}
+            setBusy={setBusy}
+            proposalJson={proposalJson}
+            setProposalJson={setProposalJson}
+            onSessionUpdated={setSession}
+            onTopicsChanged={onTopicsChanged}
+            onSelectTopic={onSelectTopic}
+            testIdPrefix="intake"
+          />
+        )}
         <textarea
           id="proposal-json"
+          className="sf-textarea"
           value={proposalJson}
           onChange={(e) => setProposalJson(e.target.value)}
           rows={5}
           placeholder='{"session_mode":"intake","proposals":[...]}'
-          style={{
-            width: "100%",
-            marginTop: "6px",
-            padding: "8px",
-            fontSize: "12px",
-            fontFamily: "monospace",
-            boxSizing: "border-box",
-          }}
+          style={{ marginTop: "6px" }}
         />
-        <div style={{ display: "flex", gap: "8px", marginTop: "8px", flexWrap: "wrap" }}>
-          <button
-            type="button"
-            disabled={busy || !proposalJson.trim()}
-            onClick={() => {
-              try {
-                const bundle = extractJsonFromLlmPaste(proposalJson);
-                void handleImportProposals(bundle);
-              } catch (err) {
-                setError(err instanceof Error ? err.message : "Import failed");
-              }
-            }}
-            style={{ padding: "6px 12px", fontSize: "13px", cursor: "pointer" }}
-          >
-            Import proposals
-          </button>
-          <button
-            type="button"
-            disabled={busy}
-            onClick={handleLoadSampleProposals}
-            style={{ padding: "6px 12px", fontSize: "13px", cursor: "pointer" }}
-          >
+        <div className="btn-group" style={{ marginTop: "8px" }}>
+          <button type="button" className="btn" disabled={busy} onClick={handleLoadSampleProposals}>
             Load sample JSON
           </button>
         </div>
       </div>
 
-      <div style={{ marginBottom: "14px" }}>
+      <div className="session-field">
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
-          <h3 style={{ margin: 0, fontSize: "14px", fontWeight: 600 }}>
-            4. Proposals ({session.proposals.length}
-            {acceptedCount > 0 ? `, ${acceptedCount} accepted` : ""})
-          </h3>
+          <div className="session-field__label-row" style={{ flex: 1 }}>
+            <h3 className="sf-section-title" style={{ margin: 0 }}>
+              4. Proposals ({session.proposals.length}
+              {acceptedCount > 0 ? `, ${acceptedCount} accepted` : ""})
+            </h3>
+            <SectionPhaseHint phase="strataforge" text="gates + apply" />
+          </div>
           <button
             type="button"
+            className="btn btn--primary"
             disabled={busy || acceptedCount === 0}
             title={acceptedCount === 0 ? "Accept at least one proposal first" : "Write accepted scaffolds to disk"}
             onClick={() => void handleApplySession()}
-            style={{
-              padding: "6px 12px",
-              fontSize: "13px",
-              cursor: acceptedCount === 0 ? "not-allowed" : "pointer",
-              fontWeight: 600,
-              opacity: acceptedCount === 0 ? 0.5 : 1,
-            }}
           >
             Apply session
           </button>
         </div>
         {session.proposals.length === 0 ? (
-          <p style={{ margin: "8px 0 0", fontSize: "13px", color: "#6b7280" }}>
+          <p className="sf-hint" style={{ marginTop: "8px" }}>
             No proposals yet — import JSON or run the sample demo above.
           </p>
         ) : (
@@ -492,36 +406,20 @@ export default function SessionPanel({
       </div>
 
       {statusMessage && (
-        <div
-          style={{
-            margin: "0 0 12px",
-            padding: "12px",
-            background: "#ecfdf5",
-            border: "1px solid #a7f3d0",
-            borderRadius: "8px",
-          }}
-        >
-          <p style={{ margin: 0, fontSize: "13px", color: "#065f46" }}>{statusMessage}</p>
+        <div className="sf-banner sf-banner--success" style={{ marginBottom: "12px" }}>
+          <p style={{ margin: 0 }}>{statusMessage}</p>
           {appliedTopics.length > 0 && (
             <div style={{ marginTop: "10px" }}>
-              <p style={{ margin: "0 0 6px", fontSize: "12px", fontWeight: 600, color: "#047857" }}>
+              <p style={{ margin: "0 0 6px", fontSize: "12px", fontWeight: 600 }}>
                 Created topics — click to open:
               </p>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+              <div className="btn-group">
                 {appliedTopics.map((topic) => (
                   <button
                     key={topic.id}
                     type="button"
+                    className="btn btn--pill"
                     onClick={() => onSelectTopic(topic.id)}
-                    style={{
-                      padding: "4px 10px",
-                      fontSize: "12px",
-                      cursor: "pointer",
-                      background: "#fff",
-                      border: "1px solid #6ee7b7",
-                      borderRadius: "999px",
-                      color: "#047857",
-                    }}
                   >
                     {topic.title}
                   </button>
@@ -531,9 +429,7 @@ export default function SessionPanel({
           )}
         </div>
       )}
-      {error && (
-        <p style={{ margin: 0, fontSize: "13px", color: "#b91c1c" }}>{error}</p>
-      )}
+      {error && <p className="sf-error-text" style={{ margin: 0 }}>{error}</p>}
     </section>
   );
 }

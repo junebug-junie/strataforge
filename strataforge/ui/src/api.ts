@@ -68,12 +68,14 @@ export interface TopicContext {
   depends_on: TopicRef[];
   feeds_into: TopicRef[];
   blocks: TopicRef[];
+  recommended_commands: string[];
 }
 
 export interface TopicUpdatePatch {
   review_state?: string;
   status?: string;
   coverage?: Partial<CoverageFlags>;
+  body?: string;
 }
 
 export interface ProposalRecord {
@@ -110,6 +112,33 @@ export interface ImportProposalsResult {
 
 export interface ApplySessionResult {
   created: TopicRecord[];
+}
+
+export interface LlmStatus {
+  configured: boolean;
+  provider: string;
+  model: string;
+  base_url: string;
+}
+
+export interface LlmRunResult {
+  text: string;
+  model: string;
+  command: string;
+  imported?: boolean;
+  proposal_count?: number;
+  parse_error?: string | null;
+  accepted_count?: number;
+  applied?: boolean;
+  created?: TopicRecord[];
+}
+
+export interface LlmPipelineRequest {
+  command: "intake" | "decompose" | "link";
+  source_prompt?: string;
+  accept_all?: boolean;
+  apply?: boolean;
+  structured?: boolean;
 }
 
 export interface RadarItem {
@@ -191,6 +220,7 @@ export async function updateTopic(
   if (patch.coverage !== undefined) {
     body.coverage = { ...(currentCoverage ?? {}), ...patch.coverage };
   }
+  if (patch.body !== undefined) body.body = patch.body;
   const r = await apiFetch(
     `${API_BASE}/api/projects/${encodeURIComponent(projectId)}/topics/${encodeURIComponent(topicId)}`,
     {
@@ -206,11 +236,12 @@ export async function startSession(
   projectId: string,
   title: string,
   mode = "intake",
+  topicId?: string | null,
 ): Promise<SessionDetail> {
   const r = await apiFetch(`${API_BASE}/api/projects/${encodeURIComponent(projectId)}/sessions`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ title, mode }),
+    body: JSON.stringify({ title, mode, topic_id: topicId ?? null }),
   });
   return r.json();
 }
@@ -315,9 +346,10 @@ export async function listSessions(
   return r.json();
 }
 
-export async function getSessionIntakePrompt(
+export async function getSessionPrompt(
   projectId: string,
   sessionId: string,
+  command: "intake" | "decompose" | "link",
   sourcePrompt?: string,
 ): Promise<string> {
   const query =
@@ -325,16 +357,25 @@ export async function getSessionIntakePrompt(
       ? `?source_prompt=${encodeURIComponent(sourcePrompt)}`
       : "";
   const r = await apiFetch(
-    `${API_BASE}/api/projects/${encodeURIComponent(projectId)}/sessions/${encodeURIComponent(sessionId)}/prompts/intake${query}`,
+    `${API_BASE}/api/projects/${encodeURIComponent(projectId)}/sessions/${encodeURIComponent(sessionId)}/prompts/${command}${query}`,
   );
   const data = (await r.json()) as { prompt: string };
   return data.prompt;
 }
 
+/** @deprecated Use getSessionPrompt(projectId, sessionId, "intake", sourcePrompt) */
+export async function getSessionIntakePrompt(
+  projectId: string,
+  sessionId: string,
+  sourcePrompt?: string,
+): Promise<string> {
+  return getSessionPrompt(projectId, sessionId, "intake", sourcePrompt);
+}
+
 export async function getTopicPrompt(
   projectId: string,
   topicId: string,
-  command: "expand" | "reconcile-parent",
+  command: "expand" | "reconcile-parent" | "boundary-check" | "decompose" | "link",
 ): Promise<string> {
   const r = await apiFetch(
     `${API_BASE}/api/projects/${encodeURIComponent(projectId)}/topics/${encodeURIComponent(topicId)}/prompts/${command}`,
@@ -346,6 +387,54 @@ export async function getTopicPrompt(
 export async function listRadar(projectId: string): Promise<RadarItem[]> {
   const r = await apiFetch(
     `${API_BASE}/api/projects/${encodeURIComponent(projectId)}/radar`,
+  );
+  return r.json();
+}
+
+export async function getLlmStatus(): Promise<LlmStatus> {
+  const r = await apiFetch(`${API_BASE}/api/llm/status`);
+  return r.json();
+}
+
+export async function runSessionLlm(
+  projectId: string,
+  sessionId: string,
+  command: "intake" | "decompose" | "link",
+  sourcePrompt?: string,
+): Promise<LlmRunResult> {
+  const query = new URLSearchParams({ command, structured: "true" });
+  if (sourcePrompt !== undefined) query.set("source_prompt", sourcePrompt);
+  const r = await apiFetch(
+    `${API_BASE}/api/projects/${encodeURIComponent(projectId)}/sessions/${encodeURIComponent(sessionId)}/llm/run?${query}`,
+    { method: "POST" },
+  );
+  return r.json();
+}
+
+export async function runSessionLlmPipeline(
+  projectId: string,
+  sessionId: string,
+  body: LlmPipelineRequest,
+): Promise<LlmRunResult> {
+  const r = await apiFetch(
+    `${API_BASE}/api/projects/${encodeURIComponent(projectId)}/sessions/${encodeURIComponent(sessionId)}/llm/pipeline`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    },
+  );
+  return r.json();
+}
+
+export async function runTopicLlm(
+  projectId: string,
+  topicId: string,
+  command: "expand" | "reconcile-parent" | "boundary-check" | "decompose" | "link",
+): Promise<LlmRunResult> {
+  const r = await apiFetch(
+    `${API_BASE}/api/projects/${encodeURIComponent(projectId)}/topics/${encodeURIComponent(topicId)}/llm/run?command=${encodeURIComponent(command)}`,
+    { method: "POST" },
   );
   return r.json();
 }

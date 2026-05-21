@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import SessionPanel from "./SessionPanel";
 import TopicWorkspace from "./TopicWorkspace";
+import WorkflowCallout from "./WorkflowCallout";
 
 export type PairingViewMode = "atlas-only" | "topic-focus" | "session-focus";
 
@@ -20,10 +21,15 @@ export default function PairingPlane({
   onSelectTopic,
 }: PairingPlaneProps) {
   const [sessionOpen, setSessionOpen] = useState(false);
+  const [activeSessionMode, setActiveSessionMode] = useState<"decompose" | "link" | null>(null);
   const viewMode: PairingViewMode = selectedTopicId ? "topic-focus" : "session-focus";
 
+  useEffect(() => {
+    setActiveSessionMode(null);
+  }, [selectedTopicId]);
+
   return (
-    <div className="pairing-plane" style={{ display: "flex", flexDirection: "column", width: "100%" }}>
+    <div className="pairing-plane">
       {viewMode === "topic-focus" && selectedTopicId && (
         <TopicWorkspace
           key={selectedTopicId}
@@ -32,50 +38,49 @@ export default function PairingPlane({
           topicTitle={selectedTopicTitle ?? selectedTopicId}
           onUpdated={onTopicsChanged}
           onSelectTopic={onSelectTopic}
+          activeSessionMode={activeSessionMode}
+          onOpenSession={(mode) => {
+            setActiveSessionMode(mode);
+            if (mode) setSessionOpen(false);
+          }}
+          onOpenSessionHistory={() => setSessionOpen(true)}
         />
       )}
 
       {viewMode === "session-focus" && (
-        <div style={{ flex: 1, overflow: "auto", padding: "16px" }}>
-          <h2 style={{ margin: "0 0 12px", fontSize: "14px", fontWeight: 600, color: "#374151" }}>
-            Active Pairing Session
-          </h2>
+        <div className="session-focus-wrap">
+          <h2>Active pairing session</h2>
+          <WorkflowCallout
+            testId="workflow-session-focus"
+            compact
+            title="You are in intake mode"
+            summary="This is where flat atlas areas are born. After Apply, click a topic pill above — the center panel switches to topic workspace, and this session moves to Session history."
+          />
+          <div className="sf-panel">
           <SessionPanel
             projectId={projectId}
             onTopicsChanged={onTopicsChanged}
             onSelectTopic={onSelectTopic}
           />
+          </div>
         </div>
       )}
 
       {viewMode === "topic-focus" && (
-        <div style={{ borderTop: "1px solid #eee", flexShrink: 0 }}>
+        <div style={{ flexShrink: 0 }}>
           <button
             type="button"
+            className="session-drawer-toggle"
             onClick={() => setSessionOpen((o) => !o)}
-            style={{
-              width: "100%",
-              display: "flex",
-              alignItems: "center",
-              gap: "8px",
-              padding: "10px 16px",
-              fontSize: "13px",
-              fontWeight: 600,
-              color: "#374151",
-              background: "#f9fafb",
-              border: "none",
-              cursor: "pointer",
-              textAlign: "left",
-            }}
           >
             <span style={{ fontSize: "10px" }}>{sessionOpen ? "▼" : "▶"}</span>
             Session history
-            <span style={{ fontWeight: 400, fontSize: "12px", color: "#6b7280" }}>
-              — intake proposals and gates
+            <span style={{ fontWeight: 400, fontSize: "12px", color: "var(--sf-text-subtle)" }}>
+              — past intake / provenance (not your main workspace)
             </span>
           </button>
           {sessionOpen && (
-            <div style={{ padding: "0 16px 16px", maxHeight: "40vh", overflow: "auto" }}>
+            <div className="session-drawer-body">
               <SessionPanel
                 projectId={projectId}
                 onTopicsChanged={onTopicsChanged}

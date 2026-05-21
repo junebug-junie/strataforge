@@ -50,6 +50,19 @@ cd strataforge/ui && npm install && npm run dev
 
 Copy `.env.example` to `.env` and adjust paths if needed.
 
+## Embedded LLM (OpenAI-compatible)
+
+Set in `.env` (API reads these; keys never go in the browser):
+
+```bash
+STRATA_LLM_PROVIDER=openai
+OPENAI_API_KEY=sk-...
+OPENAI_MODEL=gpt-4o-mini
+# OPENAI_BASE_URL=https://api.openai.com/v1   # or Ollama/LiteLLM
+```
+
+Restart `docker compose up -d --build`. The UI shows **Run with LLM** on intake, decompose, link, and expand. Proposals still require **Accept → Apply** (HITL gates unchanged).
+
 ## MVP walkthrough
 
 This follows the manual-paste-first loop: **init → intake → import → accept → apply → radar → prompt**.

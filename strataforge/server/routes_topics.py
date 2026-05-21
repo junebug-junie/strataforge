@@ -3,7 +3,14 @@ from pydantic import BaseModel, Field
 
 from strataforge.core.status import DesignStatus, ReviewState
 from strataforge.core.topic_store import get_topic, list_topics, try_get_topic, update_topic
-from strataforge.llm.prompts import build_expansion_prompt, build_reconciliation_prompt
+from strataforge.llm.topic_commands import recommended_ui_commands
+from strataforge.llm.prompts import (
+    build_boundary_prompt,
+    build_decompose_prompt,
+    build_expansion_prompt,
+    build_link_prompt,
+    build_reconciliation_prompt,
+)
 from strataforge.models import CoverageFlags
 from strataforge.server.deps import resolve_project_paths
 
@@ -30,6 +37,7 @@ class TopicUpdateRequest(BaseModel):
     review_state: ReviewState | None = None
     status: DesignStatus | None = None
     coverage: CoverageFlags | None = None
+    body: str | None = None
 
 
 class PromptResponse(BaseModel):
@@ -50,6 +58,7 @@ class TopicContextResponse(BaseModel):
     depends_on: list[TopicRef]
     feeds_into: list[TopicRef]
     blocks: list[TopicRef]
+    recommended_commands: list[str] = Field(default_factory=list)
 
 
 def _resolve_refs(paths, topic_ids: list[str]) -> list[TopicRef]:
@@ -117,6 +126,7 @@ def get_topic_context(project_id: str, topic_id: str) -> TopicContextResponse:
         depends_on=_resolve_refs(paths, topic.depends_on),
         feeds_into=_resolve_refs(paths, topic.feeds_into),
         blocks=_resolve_refs(paths, topic.blocks),
+        recommended_commands=recommended_ui_commands(paths, topic_id),
     )
 
 
@@ -136,6 +146,7 @@ def update_topic_fields(
             review_state=body.review_state,
             status=body.status,
             coverage=body.coverage,
+            body=body.body,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -152,6 +163,12 @@ def get_topic_prompt(project_id: str, topic_id: str, command: str) -> PromptResp
             prompt = build_expansion_prompt(paths, topic_id)
         elif command == "reconcile-parent":
             prompt = build_reconciliation_prompt(paths, topic_id)
+        elif command == "boundary-check":
+            prompt = build_boundary_prompt(paths, topic_id)
+        elif command == "decompose":
+            prompt = build_decompose_prompt(paths, topic_id, session_id=f"topic-session:{topic_id}")
+        elif command == "link":
+            prompt = build_link_prompt(paths, topic_id, session_id=f"topic-session:{topic_id}")
         else:
             raise HTTPException(
                 status_code=400,

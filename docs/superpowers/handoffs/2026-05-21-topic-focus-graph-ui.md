@@ -158,13 +158,15 @@ Check spec §14.1 proposal kinds and what's implemented in `apply_engine.py` —
 
 ## Verification checklist
 
-- [ ] Click atlas topic → topic workspace is immediately visible without scrolling past session
-- [ ] Session/proposal cards not default view after topic selection
-- [ ] Parent/children/neighbors shown for selected topic (even if empty)
-- [ ] Local graph renders selected node; clicking neighbor changes selection
-- [ ] Expand prompt still works from topic workspace
-- [ ] `pytest -q` passes
-- [ ] Docker UI rebuild works at `/strataforge/`
+- [x] Click atlas topic → topic workspace is immediately visible without scrolling past session
+- [x] Session/proposal cards not default view after topic selection
+- [x] Parent/children/neighbors shown for selected topic (even if empty)
+- [x] Local graph renders selected node (React Flow 1-hop); clicking neighbor changes selection
+- [x] Expand prompt still works from topic workspace (+ Run with LLM + save body)
+- [x] Decompose/link sessions with apply engine for children and edges
+- [x] OpenAI-compatible embedded LLM (`POST .../llm/run`, UI Run buttons)
+- [x] `pytest -q` passes (50+)
+- [x] Docker UI rebuild works at `/strataforge/`
 
 ---
 

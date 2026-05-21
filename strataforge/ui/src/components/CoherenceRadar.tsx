@@ -62,51 +62,36 @@ export default function CoherenceRadar({ projectId, onSelectTopic }: CoherenceRa
   return (
     <div>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
-        <h2 style={{ margin: 0, fontSize: "14px", fontWeight: 600 }}>Coherence Radar</h2>
-        <button
-          type="button"
-          onClick={handleScan}
-          disabled={scanning || loading}
-          style={{
-            padding: "4px 8px",
-            fontSize: "12px",
-            cursor: scanning || loading ? "not-allowed" : "pointer",
-          }}
-        >
+        <h2>Coherence Radar</h2>
+        <button type="button" className="btn" onClick={handleScan} disabled={scanning || loading}>
           {scanning ? "Scanning…" : "Scan"}
         </button>
       </div>
 
-      <p style={{ margin: "8px 0 12px", fontSize: "12px", color: "#6b7280" }}>Needs attention</p>
+      <p className="sf-hint" style={{ margin: "8px 0 12px" }}>Needs attention</p>
 
-      {loading && <p style={{ margin: 0, fontSize: "13px", color: "#6b7280" }}>Loading radar…</p>}
+      {loading && <p className="sf-muted">Loading radar…</p>}
 
-      {error && (
-        <p style={{ margin: "0 0 8px", fontSize: "13px", color: "#b91c1c" }}>{error}</p>
-      )}
+      {error && <p className="sf-error-text" style={{ marginBottom: "8px" }}>{error}</p>}
 
       {!loading && !error && items.length === 0 && (
-        <p style={{ margin: 0, fontSize: "13px", color: "#6b7280" }}>
-          No findings. Run Scan to refresh the queue.
-        </p>
+        <p className="sf-muted">No findings. Run Scan to refresh the queue.</p>
       )}
 
       <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
         {items.map((item) => {
           const severityStyle = SEVERITY_COLORS[item.severity] ?? SEVERITY_COLORS.low;
           return (
-            <li key={item.id} style={{ marginBottom: "10px" }}>
+            <li key={item.id}>
               <button
                 type="button"
+                className="radar-item"
                 onClick={() => onSelectTopic(item.topic_id)}
                 style={{
                   width: "100%",
                   textAlign: "left",
                   border: `1px solid ${severityStyle.border}`,
-                  borderRadius: "8px",
-                  padding: "10px",
-                  background: "#fff",
-                  cursor: "pointer",
+                  background: severityStyle.bg,
                 }}
               >
                 <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
@@ -149,11 +134,7 @@ export default function CoherenceRadar({ projectId, onSelectTopic }: CoherenceRa
       </ul>
 
       {!loading && items.length > 0 && (
-        <button
-          type="button"
-          onClick={() => void refresh()}
-          style={{ marginTop: "4px", fontSize: "12px", padding: "4px 8px" }}
-        >
+        <button type="button" className="btn btn--ghost" onClick={() => void refresh()} style={{ marginTop: "8px" }}>
           Refresh
         </button>
       )}

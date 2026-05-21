@@ -87,7 +87,7 @@ export default function TopicEditor({ projectId, topicId, onUpdated }: TopicEdit
         await applyUpdate(patch, detail.topic.coverage);
         notify(`${label} ${nextVal ? "on" : "off"}.`, "success");
       } catch {
-        // applyUpdate already toasts errors
+        /* applyUpdate already toasts */
       }
     })();
   };
@@ -107,7 +107,7 @@ export default function TopicEditor({ projectId, topicId, onUpdated }: TopicEdit
         await applyUpdate({ status: next }, detail.topic.coverage);
         notify(`Status advanced to ${next.replace("_", " ")}.`, "success");
       } catch {
-        // applyUpdate already toasts errors
+        /* applyUpdate already toasts */
       }
     })();
   };
@@ -132,11 +132,11 @@ export default function TopicEditor({ projectId, topicId, onUpdated }: TopicEdit
   };
 
   if (loading) {
-    return <p style={{ color: "#666" }}>Loading topic…</p>;
+    return <p className="sf-muted">Loading topic…</p>;
   }
 
   if (error) {
-    return <p style={{ color: "#b91c1c" }}>{error}</p>;
+    return <p className="sf-error-text">{error}</p>;
   }
 
   if (!detail) {
@@ -146,25 +146,25 @@ export default function TopicEditor({ projectId, topicId, onUpdated }: TopicEdit
   const { topic, body } = detail;
 
   return (
-    <article style={{ textAlign: "left" }}>
-      <header style={{ marginBottom: "16px" }}>
-        <h2 style={{ margin: "0 0 8px", fontSize: "22px", fontWeight: 600 }}>{topic.title}</h2>
-        <p style={{ margin: "0 0 4px", fontSize: "13px", color: "#666" }}>
-          <span style={{ marginRight: "12px" }}>
-            Status: <strong>{topic.status}</strong>
+    <article>
+      <header style={{ marginBottom: "20px" }}>
+        <h2 style={{ margin: "0 0 8px", fontSize: "20px", fontWeight: 700, letterSpacing: "-0.02em" }}>
+          {topic.title}
+        </h2>
+        <p className="sf-muted" style={{ margin: 0, fontSize: "13px" }}>
+          <span style={{ marginRight: "16px" }}>
+            Status <span className="status-badge">{topic.status}</span>
           </span>
           <span>
-            Review: <strong>{topic.review_state}</strong>
+            Review <span className="status-badge">{topic.review_state}</span>
           </span>
         </p>
       </header>
 
-      <section style={{ marginBottom: "16px" }}>
-        <h3 style={{ margin: "0 0 4px", fontSize: "14px", fontWeight: 600 }}>Coverage flags</h3>
-        <p style={{ margin: "0 0 8px", fontSize: "12px", color: "#6b7280" }}>
-          Click a flag to turn it on or off (saved to topic file).
-        </p>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+      <section className="sf-section">
+        <h3 className="sf-section-title">Coverage flags</h3>
+        <p className="sf-hint">Click a flag to turn it on or off (saved to topic file).</p>
+        <div className="btn-group" style={{ marginTop: "10px" }}>
           {COVERAGE_FLAGS.map(({ key, label }) => {
             const active = topic.coverage[key];
             return (
@@ -176,16 +176,7 @@ export default function TopicEditor({ projectId, topicId, onUpdated }: TopicEdit
                 data-testid={`coverage-${key}`}
                 title={active ? `Clear ${label}` : `Set ${label}`}
                 onClick={() => toggleCoverage(key)}
-                style={{
-                  fontSize: "12px",
-                  padding: "4px 10px",
-                  borderRadius: "999px",
-                  cursor: updating ? "wait" : "pointer",
-                  background: active ? "#dbeafe" : "#fff",
-                  color: active ? "#1e40af" : "#6b7280",
-                  border: `1px solid ${active ? "#6366f1" : "#d1d5db"}`,
-                  fontWeight: active ? 600 : 400,
-                }}
+                className="flag-pill"
               >
                 {active ? "✓ " : ""}
                 {label}
@@ -193,72 +184,60 @@ export default function TopicEditor({ projectId, topicId, onUpdated }: TopicEdit
             );
           })}
         </div>
-        {actionError && (
-          <p style={{ margin: "8px 0 0", fontSize: "13px", color: "#b91c1c" }}>{actionError}</p>
-        )}
+        {actionError && <p className="sf-error-text" style={{ marginTop: "8px" }}>{actionError}</p>}
       </section>
 
-      <section style={{ marginBottom: "16px" }}>
-        <h3 style={{ margin: "0 0 8px", fontSize: "14px", fontWeight: 600 }}>Status promotion</h3>
-        <p style={{ margin: "0 0 8px", fontSize: "12px", color: "#6b7280" }}>
+      <section className="sf-section">
+        <h3 className="sf-section-title">Status promotion</h3>
+        <p className="sf-hint">
           scaffolded → expanded → reconciled → execution ready (one step per click)
         </p>
         <button
           type="button"
+          className="btn btn--primary"
           data-testid="advance-status"
           disabled={updating || nextDesignStatus(topic.status) === null}
           onClick={handleAdvanceStatus}
-          style={{ padding: "6px 12px", fontSize: "13px", cursor: "pointer" }}
+          style={{ marginTop: "8px" }}
         >
           {advanceStatusLabel(topic.status)}
         </button>
       </section>
 
-      <section style={{ marginBottom: "16px" }}>
-        <h3 style={{ margin: "0 0 8px", fontSize: "14px", fontWeight: 600 }}>LLM prompts</h3>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+      <section className="sf-section">
+        <h3 className="sf-section-title">LLM prompts</h3>
+        <p className="sf-hint">
+          Copies a prompt to clipboard → paste in ChatGPT/Claude → use the reply in the topic body or notes.
+          For structured changes (children, links), use Decompose / Add link in the toolbar above.
+        </p>
+        <div className="btn-group">
           <button
             type="button"
+            className="btn"
             data-testid="copy-expand-prompt"
             disabled={updating}
             onClick={() => void copyPrompt("expand", "Expansion prompt")}
-            style={{ padding: "6px 12px", fontSize: "13px", cursor: "pointer" }}
           >
             Copy expansion prompt
           </button>
           <button
             type="button"
+            className="btn"
             data-testid="copy-reconcile-prompt"
             disabled={updating}
             onClick={() => void copyPrompt("reconcile-parent", "Reconciliation prompt")}
-            style={{ padding: "6px 12px", fontSize: "13px", cursor: "pointer" }}
           >
             Copy reconcile prompt
           </button>
         </div>
         {promptMessage && (
-          <p style={{ margin: "8px 0 0", fontSize: "13px", color: "#059669" }}>{promptMessage}</p>
+          <p style={{ margin: "8px 0 0", fontSize: "13px", color: "var(--sf-success)" }}>{promptMessage}</p>
         )}
       </section>
 
-      <section>
-        <h3 style={{ margin: "0 0 8px", fontSize: "14px", fontWeight: 600 }}>Body</h3>
-        <pre
-          style={{
-            margin: 0,
-            padding: "12px",
-            background: "#f9fafb",
-            border: "1px solid #e5e7eb",
-            borderRadius: "6px",
-            fontSize: "13px",
-            lineHeight: 1.5,
-            whiteSpace: "pre-wrap",
-            overflow: "auto",
-            maxHeight: "60vh",
-          }}
-        >
-          {body || "(empty)"}
-        </pre>
+      <section className="sf-section">
+        <h3 className="sf-section-title">Body</h3>
+        <pre className="sf-pre">{body || "(empty)"}</pre>
       </section>
     </article>
   );

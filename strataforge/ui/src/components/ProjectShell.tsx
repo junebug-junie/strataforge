@@ -11,6 +11,9 @@ import CoherenceRadar from "./CoherenceRadar";
 import PairingPlane from "./PairingPlane";
 import ProjectOnboarding from "./ProjectOnboarding";
 import { useToast } from "./Toast";
+import LlmStatusBanner from "./LlmStatusBanner";
+import WorkflowCallout from "./WorkflowCallout";
+import { ATLAS_AFTER_INTAKE } from "../workflowGuides";
 
 interface ProjectShellProps {
   selectedTopicId: string | null;
@@ -136,7 +139,7 @@ export default function ProjectShell({ selectedTopicId, onSelectTopic }: Project
   };
 
   if (loading) {
-    return <p style={{ padding: "16px" }}>Loading projects…</p>;
+    return <p className="app-loading">Loading projects…</p>;
   }
 
   if (projects.length === 0) {
@@ -148,15 +151,15 @@ export default function ProjectShell({ selectedTopicId, onSelectTopic }: Project
   return (
     <div className="app-shell">
       <header className="app-topbar">
-        <div style={{ minWidth: "200px", flex: "1 1 220px" }}>
-          <label htmlFor="project-select" style={{ display: "block", fontSize: "12px", color: "#666" }}>
+        <div className="app-topbar__field">
+          <label className="sf-label" htmlFor="project-select">
             Project
           </label>
           <select
             id="project-select"
+            className="sf-select"
             value={projectId ?? ""}
             onChange={(e) => handleProjectChange(e.target.value)}
-            style={{ width: "100%", marginTop: "4px", padding: "6px" }}
           >
             {projects.map((p) => (
               <option key={p.project_id} value={p.project_id}>
@@ -165,54 +168,47 @@ export default function ProjectShell({ selectedTopicId, onSelectTopic }: Project
             ))}
           </select>
         </div>
-        {!showNewProject ? (
-          <button
-            type="button"
-            onClick={() => setShowNewProject(true)}
-            style={{
-              padding: "6px 0",
-              fontSize: "12px",
-              color: "#1e40af",
-              background: "none",
-              border: "none",
-              cursor: "pointer",
-            }}
-          >
-            + New project
-          </button>
-        ) : (
-          <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", alignItems: "center" }}>
-            <input
-              type="text"
-              value={newTitle}
-              onChange={(e) => setNewTitle(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") void handleCreateAnother();
-              }}
-              placeholder="Project title"
-              disabled={creating}
-              style={{ padding: "6px", fontSize: "12px", minWidth: "180px" }}
-            />
-            <button
-              type="button"
-              disabled={creating}
-              onClick={() => void handleCreateAnother()}
-              style={{ fontSize: "12px", padding: "4px 8px", cursor: "pointer" }}
-            >
-              Create
+        <div className="app-topbar__actions">
+          {!showNewProject ? (
+            <button type="button" className="btn btn--ghost" onClick={() => setShowNewProject(true)}>
+              + New project
             </button>
-            <button
-              type="button"
-              onClick={() => {
-                setShowNewProject(false);
-                setNewTitle("");
-              }}
-              style={{ fontSize: "12px", padding: "4px 8px", cursor: "pointer" }}
-            >
-              Cancel
-            </button>
-          </div>
-        )}
+          ) : (
+            <>
+              <input
+                type="text"
+                className="sf-input"
+                value={newTitle}
+                onChange={(e) => setNewTitle(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") void handleCreateAnother();
+                }}
+                placeholder="Project title"
+                disabled={creating}
+                style={{ minWidth: "180px" }}
+              />
+              <button
+                type="button"
+                className="btn btn--primary"
+                disabled={creating}
+                onClick={() => void handleCreateAnother()}
+              >
+                Create
+              </button>
+              <button
+                type="button"
+                className="btn"
+                onClick={() => {
+                  setShowNewProject(false);
+                  setNewTitle("");
+                }}
+              >
+                Cancel
+              </button>
+            </>
+          )}
+        </div>
+        <LlmStatusBanner />
       </header>
 
       <div className="app-body">
@@ -223,19 +219,25 @@ export default function ProjectShell({ selectedTopicId, onSelectTopic }: Project
               {selectedTopicId && (
                 <button
                   type="button"
-                  className="app-atlas-back"
+                  className="btn btn--ghost"
                   onClick={() => handleSelectTopic(null)}
                 >
                   ← Intake session
                 </button>
               )}
             </div>
-            {!selectedTopicId && (
-              <p style={{ margin: "0 0 8px", fontSize: "12px", color: "#6b7280" }}>
-                {topics.length === 0
-                  ? "No topics yet — complete intake and Apply session to populate the atlas."
-                  : `${topics.length} topic(s) — select a topic to open its workspace.`}
+            {!selectedTopicId && topics.length === 0 && (
+              <p className="app-atlas-hint">
+                No topics yet — complete the intake session below, then Apply to populate the Atlas.
               </p>
+            )}
+            {!selectedTopicId && topics.length > 0 && (
+              <WorkflowCallout
+                testId="workflow-atlas-next"
+                compact
+                title="Atlas ready — pick a topic to continue"
+                steps={ATLAS_AFTER_INTAKE}
+              />
             )}
             <AtlasTree
               topics={topics}
@@ -262,33 +264,12 @@ export default function ProjectShell({ selectedTopicId, onSelectTopic }: Project
 
         {projectId && (
           <aside className="app-radar">
-            <CoherenceRadar
-              projectId={projectId}
-              onSelectTopic={handleSelectTopic}
-            />
+            <CoherenceRadar projectId={projectId} onSelectTopic={handleSelectTopic} />
           </aside>
         )}
       </div>
 
-      {error && (
-        <div
-          style={{
-            position: "fixed",
-            bottom: "16px",
-            right: "16px",
-            background: "#fef2f2",
-            border: "1px solid #fecaca",
-            color: "#b91c1c",
-            padding: "10px 14px",
-            borderRadius: "8px",
-            fontSize: "13px",
-            maxWidth: "320px",
-            zIndex: 10,
-          }}
-        >
-          {error}
-        </div>
-      )}
+      {error && <div className="app-error-toast">{error}</div>}
     </div>
   );
 }

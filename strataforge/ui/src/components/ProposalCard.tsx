@@ -9,13 +9,13 @@ import {
 } from "../api";
 
 const STATE_COLORS: Record<string, { bg: string; color: string; border: string }> = {
-  proposed: { bg: "#f3f4f6", color: "#374151", border: "#e5e7eb" },
-  accepted: { bg: "#dcfce7", color: "#166534", border: "#86efac" },
-  rejected: { bg: "#fee2e2", color: "#991b1b", border: "#fca5a5" },
+  proposed: { bg: "var(--sf-surface-3)", color: "var(--sf-text-muted)", border: "var(--sf-border-strong)" },
+  accepted: { bg: "var(--sf-success-soft)", color: "var(--sf-success)", border: "#86efac" },
+  rejected: { bg: "var(--sf-error-soft)", color: "var(--sf-error)", border: "#fca5a5" },
   deferred: { bg: "#fef9c3", color: "#854d0e", border: "#fde047" },
   out_of_scope: { bg: "#f3e8ff", color: "#6b21a8", border: "#d8b4fe" },
-  revised: { bg: "#dbeafe", color: "#1e40af", border: "#93c5fd" },
-  promoted_to_scaffold: { bg: "#e0e7ff", color: "#3730a3", border: "#a5b4fc" },
+  revised: { bg: "var(--sf-accent-soft)", color: "var(--sf-accent)", border: "var(--sf-accent-ring)" },
+  promoted_to_scaffold: { bg: "var(--sf-accent-soft)", color: "var(--sf-accent)", border: "var(--sf-accent-ring)" },
 };
 
 interface ProposalCardProps {
@@ -48,22 +48,15 @@ export default function ProposalCard({ projectId, proposal, onUpdated }: Proposa
 
   return (
     <article
-      style={{
-        border: `1px solid ${stateStyle.border}`,
-        borderRadius: "8px",
-        padding: "12px",
-        marginBottom: "10px",
-        background: "#fff",
-      }}
+      className="proposal-card"
+      style={{ borderColor: stateStyle.border, background: stateStyle.bg }}
     >
       <header style={{ marginBottom: "8px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-          <h4 style={{ margin: 0, fontSize: "15px", fontWeight: 600 }}>{proposal.title}</h4>
+          <h4 className="proposal-card__title">{proposal.title}</h4>
           <span
+            className="proposal-card__badge"
             style={{
-              fontSize: "11px",
-              padding: "2px 8px",
-              borderRadius: "4px",
               background: stateStyle.bg,
               color: stateStyle.color,
               border: `1px solid ${stateStyle.border}`,
@@ -71,66 +64,44 @@ export default function ProposalCard({ projectId, proposal, onUpdated }: Proposa
           >
             {proposal.state.replace(/_/g, " ")}
           </span>
-          <span style={{ fontSize: "11px", color: "#6b7280" }}>{proposal.kind}</span>
+          <span className="sf-muted" style={{ fontSize: "11px" }}>{proposal.kind}</span>
         </div>
         {proposal.summary && (
-          <p style={{ margin: "6px 0 0", fontSize: "13px", color: "#374151" }}>{proposal.summary}</p>
+          <p style={{ margin: "6px 0 0", fontSize: "13px" }}>{proposal.summary}</p>
         )}
         {proposal.rationale && (
-          <p style={{ margin: "4px 0 0", fontSize: "12px", color: "#6b7280" }}>
+          <p className="sf-hint" style={{ marginTop: "4px" }}>
             Rationale: {proposal.rationale}
           </p>
         )}
       </header>
 
       {!isFinal && (
-        <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+        <div className="proposal-card__actions">
           <button
             type="button"
+            className="btn btn--primary"
             disabled={busy}
             onClick={() => runAction(() => acceptProposal(projectId, proposal.id))}
-            style={{ padding: "4px 10px", fontSize: "12px", cursor: "pointer" }}
           >
             Accept
           </button>
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => runAction(() => rejectProposal(projectId, proposal.id))}
-            style={{ padding: "4px 10px", fontSize: "12px", cursor: "pointer" }}
-          >
+          <button type="button" className="btn" disabled={busy} onClick={() => runAction(() => rejectProposal(projectId, proposal.id))}>
             Reject
           </button>
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => runAction(() => deferProposal(projectId, proposal.id))}
-            style={{ padding: "4px 10px", fontSize: "12px", cursor: "pointer" }}
-          >
+          <button type="button" className="btn" disabled={busy} onClick={() => runAction(() => deferProposal(projectId, proposal.id))}>
             Defer
           </button>
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => runAction(() => outOfScopeProposal(projectId, proposal.id))}
-            style={{ padding: "4px 10px", fontSize: "12px", cursor: "pointer" }}
-          >
+          <button type="button" className="btn" disabled={busy} onClick={() => runAction(() => outOfScopeProposal(projectId, proposal.id))}>
             Out of scope
           </button>
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => runAction(() => reviseProposal(projectId, proposal.id))}
-            style={{ padding: "4px 10px", fontSize: "12px", cursor: "pointer" }}
-          >
+          <button type="button" className="btn" disabled={busy} onClick={() => runAction(() => reviseProposal(projectId, proposal.id))}>
             Revise
           </button>
         </div>
       )}
 
-      {error && (
-        <p style={{ margin: "8px 0 0", fontSize: "12px", color: "#b91c1c" }}>{error}</p>
-      )}
+      {error && <p className="sf-error-text" style={{ marginTop: "8px" }}>{error}</p>}
     </article>
   );
 }

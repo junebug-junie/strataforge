@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from strataforge.server.routes_projects import router as projects_router
 from strataforge.server.routes_proposals import router as proposals_router
 from strataforge.server.routes_sessions import router as sessions_router
+from strataforge.server.routes_llm import router as llm_router
 from strataforge.server.routes_topics import router as topics_router
 
 
@@ -25,4 +26,5 @@ def create_app() -> FastAPI:
     app.include_router(topics_router)
     app.include_router(sessions_router)
     app.include_router(proposals_router)
+    app.include_router(llm_router)
     return app

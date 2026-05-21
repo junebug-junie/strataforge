@@ -292,3 +292,156 @@ def build_reconciliation_prompt(paths: ProjectPaths, topic_id: str) -> str:
             context["child_dependencies"],
         ]
     )
+
+
+BOUNDARY_TEMPLATE = """You are reviewing the boundary of one StrataForge topic.
+
+Focus on the Includes / Excludes sections. Propose clarifications only for this topic."""
+
+DECOMPOSE_TEMPLATE = """You are decomposing one StrataForge topic into child components.
+
+Propose new child topics under the parent listed below. Each child must use create_component with parent_id set to the parent topic id.
+
+Do not:
+- create duplicate top-level areas
+- propose changes to unrelated topics
+- accept proposals yourself"""
+
+LINK_TEMPLATE = """You are proposing dependency links between existing StrataForge topics.
+
+Use add_dependency and/or add_feeds_into proposal kinds only. Reference existing topic ids from the atlas list.
+
+depends_on: the subject topic depends on another (prerequisite).
+feeds_into: the subject topic feeds information/events into another."""
+
+DECOMPOSE_JSON_SCHEMA = """{
+  "session_mode": "decompose",
+  "summary": "Child components proposed under parent",
+  "proposals": [
+    {
+      "kind": "create_component",
+      "title": "Child Component",
+      "summary": "One-line description",
+      "rationale": "Why this child belongs under the parent",
+      "topic_id": "topic:child-id",
+      "proposed_changes": {
+        "area_slug": "04-parent-slug-child-name",
+        "topic_id": "topic:child-id",
+        "title": "Child Component",
+        "level": "topic",
+        "parent_id": "topic:parent-id"
+      }
+    }
+  ]
+}"""
+
+LINK_JSON_SCHEMA = """{
+  "session_mode": "link",
+  "summary": "Dependency links proposed",
+  "proposals": [
+    {
+      "kind": "add_dependency",
+      "title": "A depends on B",
+      "summary": "Prerequisite relationship",
+      "rationale": "Why A needs B first",
+      "topic_id": "topic:subject",
+      "proposed_changes": {
+        "topic_id": "topic:subject",
+        "depends_on_id": "topic:prerequisite"
+      }
+    },
+    {
+      "kind": "add_feeds_into",
+      "title": "A feeds into B",
+      "summary": "Downstream data/event flow",
+      "rationale": "Why A sends into B",
+      "topic_id": "topic:source",
+      "proposed_changes": {
+        "topic_id": "topic:source",
+        "feeds_into_id": "topic:target"
+      }
+    }
+  ]
+}"""
+
+
+def _strict_json_instructions(schema: str) -> list[str]:
+    return [
+        _section_heading("Output format (STRICT — required for machine import)").strip(),
+        "Your ENTIRE reply must be ONE JSON object and NOTHING else.",
+        "",
+        "REQUIRED:",
+        "- First character: {",
+        "- Last character: }",
+        "- Valid JSON only",
+        "",
+        "Schema:",
+        "",
+        schema,
+        "",
+        "Reply with the JSON object now. No other text.",
+    ]
+
+
+def build_boundary_prompt(paths: ProjectPaths, topic_id: str) -> str:
+    context = _load_expansion_context(paths, topic_id)
+    boundary = _extract_section(context["current_topic_body"], "Boundary")
+    return "\n\n".join(
+        [
+            BOUNDARY_TEMPLATE,
+            _section_heading("Topic").strip(),
+            f"- id: {context['topic_id']}",
+            f"- title: {context['topic_title']}",
+            _section_heading("Current boundary section").strip(),
+            boundary or "(empty — propose Includes/Excludes content as a patch in your reply text; import uses proposals only for structural changes)",
+            _section_heading("Full topic body").strip(),
+            context["current_topic_body"],
+        ]
+    )
+
+
+def build_decompose_prompt(paths: ProjectPaths, topic_id: str, session_id: str) -> str:
+    context = _load_expansion_context(paths, topic_id)
+    manifest = load_manifest(paths)
+    return "\n\n".join(
+        [
+            DECOMPOSE_TEMPLATE,
+            _section_heading("Parent topic (decompose this)").strip(),
+            f"- id: {context['topic_id']}",
+            f"- title: {context['topic_title']}",
+            f"- session_id: {session_id}",
+            _section_heading("Existing children (do not duplicate)").strip(),
+            context["children_block"],
+            _section_heading("Atlas (ids + titles)").strip(),
+            _manifest_summary(manifest),
+            *_strict_json_instructions(DECOMPOSE_JSON_SCHEMA.replace("topic:parent-id", topic_id)),
+            "",
+            "Content rules:",
+            f"- Every create_component MUST set parent_id to {topic_id}",
+            "- area_slug should nest under parent area when sensible",
+            "- topic_id must be unique and start with topic:",
+        ]
+    )
+
+
+def build_link_prompt(paths: ProjectPaths, topic_id: str, session_id: str) -> str:
+    manifest = load_manifest(paths)
+    topic, _body = get_topic(paths, topic_id)
+    return "\n\n".join(
+        [
+            LINK_TEMPLATE,
+            _section_heading("Focus topic").strip(),
+            f"- id: {topic.id}",
+            f"- title: {topic.title}",
+            f"- session_id: {session_id}",
+            f"- current depends_on: {', '.join(topic.depends_on) or '(none)'}",
+            f"- current feeds_into: {', '.join(topic.feeds_into) or '(none)'}",
+            _section_heading("Atlas (use these ids only)").strip(),
+            _manifest_summary(manifest),
+            *_strict_json_instructions(LINK_JSON_SCHEMA),
+            "",
+            "Content rules:",
+            "- Propose 1–5 links involving the focus topic where useful",
+            "- Use only topic ids from the atlas list",
+        ]
+    )
