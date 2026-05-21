@@ -6,7 +6,9 @@ from strataforge import __version__
 
 app = typer.Typer(no_args_is_help=True, name="strata")
 session_app = typer.Typer(no_args_is_help=True)
+prompt_app = typer.Typer(no_args_is_help=True)
 app.add_typer(session_app, name="session")
+app.add_typer(prompt_app, name="prompt")
 
 
 @app.callback(invoke_without_command=True)
@@ -149,6 +151,38 @@ def session_set_input(
     session.updated_at = datetime.now(timezone.utc)
     save_session(paths, session)
     typer.echo(f"Stored source prompt on {session_id}")
+
+
+@prompt_app.command("expand")
+def prompt_expand(
+    topic_id: str,
+    project: Path = typer.Option(..., "--project", help="Project root path"),
+):
+    from strataforge.core.paths import ProjectPaths
+    from strataforge.llm.prompts import build_expansion_prompt
+
+    paths = ProjectPaths(project)
+    try:
+        typer.echo(build_expansion_prompt(paths, topic_id))
+    except KeyError:
+        typer.echo(f"Topic not found: {topic_id}", err=True)
+        raise typer.Exit(1)
+
+
+@prompt_app.command("reconcile-parent")
+def prompt_reconcile_parent(
+    topic_id: str,
+    project: Path = typer.Option(..., "--project", help="Project root path"),
+):
+    from strataforge.core.paths import ProjectPaths
+    from strataforge.llm.prompts import build_reconciliation_prompt
+
+    paths = ProjectPaths(project)
+    try:
+        typer.echo(build_reconciliation_prompt(paths, topic_id))
+    except KeyError:
+        typer.echo(f"Topic not found: {topic_id}", err=True)
+        raise typer.Exit(1)
 
 
 @app.command("apply")
