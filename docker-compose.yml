@@ -17,8 +17,8 @@ services:
     build:
       context: ./strataforge/ui
       dockerfile: Dockerfile
-    environment:
-      - STRATA_API_BASE=http://localhost:8787
+      args:
+        VITE_STRATA_API_BASE: /strataforge
     ports:
       - "8788:80"
     depends_on:

@@ -1,4 +1,5 @@
-const API_BASE = import.meta.env.VITE_STRATA_API_BASE ?? "http://127.0.0.1:8787";
+// Same-origin subpath: UI at /strataforge/, API proxied at /strataforge/api/
+const API_BASE = import.meta.env.VITE_STRATA_API_BASE ?? "/strataforge";
 
 export interface ProjectSummary {
   project_id: string;

@@ -12,11 +12,28 @@ docker compose up --build
 
 | Service | URL |
 |---------|-----|
-| API | http://localhost:8787 |
-| UI | http://localhost:8788 |
-| Health | http://localhost:8787/health |
+| API (direct) | http://localhost:8787 |
+| UI + API (proxied) | http://localhost:8788/strataforge/ |
+| Health (direct) | http://localhost:8787/health |
 
 Workspace files live under `./workspaces`; the SQLite index is rebuilt under `./.strata`.
+
+## Tailscale (subpath — root already in use)
+
+When another app occupies `/` on your Tailscale HTTPS endpoint, expose StrataForge under `/strataforge` only. The UI nginx container serves static files and proxies `/strataforge/api/` to the FastAPI backend, so **one** `tailscale serve` entry is enough.
+
+```bash
+docker compose up --build
+
+# Single subpath — UI + API on port 8788
+sudo tailscale serve --bg --https=443 --set-path=/strataforge http://127.0.0.1:8788
+```
+
+Open: `https://<your-tailscale-host>/strataforge/`
+
+The React app uses relative API calls (`/strataforge/api/...`), so it works on any Tailscale MagicDNS name without rebuilding for a specific hostname.
+
+To remove later: `sudo tailscale serve reset` (or `tailscale serve status` to inspect).
 
 ## Local development (without Docker)
 
@@ -89,7 +106,7 @@ Proposal cards appear in the UI session panel (or via `GET /api/projects/{projec
 
 Human gating is required before any durable write.
 
-**In the UI:** open http://localhost:8788, select the project, open the session, and use **Accept**, **Reject**, or **Defer** on each proposal card.
+**In the UI:** open http://localhost:8788/strataforge/, select the project, open the session, and use **Accept**, **Reject**, or **Defer** on each proposal card.
 
 **Via API:**
 
