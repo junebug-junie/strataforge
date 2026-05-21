@@ -7,8 +7,10 @@ from strataforge import __version__
 app = typer.Typer(no_args_is_help=True, name="strata")
 session_app = typer.Typer(no_args_is_help=True)
 prompt_app = typer.Typer(no_args_is_help=True)
+index_app = typer.Typer(no_args_is_help=True)
 app.add_typer(session_app, name="session")
 app.add_typer(prompt_app, name="prompt")
+app.add_typer(index_app, name="index")
 
 
 @app.callback(invoke_without_command=True)
@@ -235,6 +237,18 @@ def gaps_cmd(path: str = "."):
         typer.echo(f"{category}:")
         for topic_id in topic_ids:
             typer.echo(f"  - {topic_id}")
+
+
+@index_app.command("rebuild")
+def index_rebuild(
+    project: Path = typer.Option(..., "--project", help="Project root path"),
+):
+    from strataforge.core.indexer import rebuild_index
+    from strataforge.core.paths import ProjectPaths
+
+    paths = ProjectPaths(project)
+    rebuild_index(paths)
+    typer.echo(f"Rebuilt index at {paths.db_path}")
 
 
 @app.command("apply")
