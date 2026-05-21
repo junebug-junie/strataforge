@@ -61,3 +61,19 @@ def show_cmd(topic_id: str, path: str = "."):
     typer.echo(f"status: {topic.status.value}")
     typer.echo(f"review_state: {topic.review_state.value}")
     typer.echo(f"proposal_state: {topic.proposal_state.value}")
+
+
+@app.command("validate")
+def validate_cmd(path: str = "."):
+    from strataforge.core.paths import ProjectPaths
+    from strataforge.core.validation import validate_project
+
+    paths = ProjectPaths(Path(path))
+    issues = validate_project(paths)
+    if not issues:
+        typer.echo("No validation issues found.")
+        return
+    for issue in issues:
+        topic = f" ({issue.topic_id})" if issue.topic_id else ""
+        typer.echo(f"{issue.code}{topic}: {issue.message}", err=True)
+    raise typer.Exit(1)
