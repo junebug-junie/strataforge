@@ -3,6 +3,7 @@ import {
   acceptProposal,
   applySession,
   getSession,
+  getSessionIntakePrompt,
   importProposals,
   listSessions,
   startSession,
@@ -11,25 +12,6 @@ import {
 } from "../api";
 import { SAMPLE_INTAKE_BUNDLE } from "../sampleIntakeBundle";
 import ProposalCard from "./ProposalCard";
-
-const INTAKE_JSON_SCHEMA = `{
-  "session_mode": "intake",
-  "summary": "Brief summary of proposed decomposition",
-  "proposals": [
-    {
-      "kind": "create_component",
-      "title": "Component Name",
-      "summary": "One-line description",
-      "rationale": "Why this component belongs in the architecture",
-      "proposed_changes": {
-        "area_slug": "01-component-slug",
-        "topic_id": "topic:component-id",
-        "title": "Component Name",
-        "level": "area"
-      }
-    }
-  ]
-}`;
 
 function extractJsonFromLlmPaste(text: string): Record<string, unknown> {
   const trimmed = text.trim();
@@ -66,71 +48,37 @@ function extractJsonFromLlmPaste(text: string): Record<string, unknown> {
   );
 }
 
-function buildIntakePrompt(sourcePrompt: string, sessionId: string, projectId: string): string {
-  return `You are an architecture design partner for StrataForge (manual paste / intake mode).
-
-The human has described an architecture idea. Propose a bounded decomposition into top-level area components. Do not redesign unrelated areas. Distinguish proposals from accepted design. Include rationale and risks.
-
-## Architecture idea
-
-${sourcePrompt.trim() || "(no source prompt saved yet — paste the idea in the UI first)"}
-
-## Session context
-
-- project_id: ${projectId}
-- session_id: ${sessionId}
-- mode: intake
-
-## Output format (STRICT — required for machine import)
-
-Your ENTIRE reply must be ONE JSON object and NOTHING else.
-
-FORBIDDEN (import will fail if you include any of these):
-- Markdown code fences (no \`\`\` or \`\`\`json)
-- Introductory text ("Sure!", "Here is the JSON:", "Below is...")
-- Explanations, summaries, or bullet lists outside the JSON
-- Trailing commentary after the closing brace
-
-REQUIRED:
-- The first character of your reply MUST be {
-- The last character of your reply MUST be }
-- Valid JSON only — the human copies your whole reply into an import field
-
-Schema to follow exactly:
-
-${INTAKE_JSON_SCHEMA}
-
-Content rules:
-- Propose 3–8 create_component items for this intake.
-- Use snake-case area_slug prefixes like 01-session-runtime.
-- topic_id must start with topic: and be unique within the bundle.
-- Do not accept or apply proposals — the human gates each card in the UI.
-
-Reply with the JSON object now. No other text.`;
-}
-
 interface SessionPanelProps {
   projectId: string;
   onTopicsChanged: () => void;
+  onSelectTopic: (topicId: string) => void;
 }
 
 const STEPS = [
   "Describe your architecture idea",
-  "Copy prompt → paste into ChatGPT/Claude (it must reply with raw JSON only)",
-  "Copy the LLM's entire reply back here (we accept ```json fences too)",
+  "Copy the augmented prompt below → paste into ChatGPT/Claude",
+  "Copy the LLM's entire reply back here (```json fences are OK)",
   "Accept proposals, then Apply session",
 ];
 
-export default function SessionPanel({ projectId, onTopicsChanged }: SessionPanelProps) {
+export default function SessionPanel({
+  projectId,
+  onTopicsChanged,
+  onSelectTopic,
+}: SessionPanelProps) {
   const [session, setSession] = useState<SessionDetail | null>(null);
   const [sourcePrompt, setSourcePrompt] = useState("");
   const [proposalJson, setProposalJson] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [appliedTopics, setAppliedTopics] = useState<{ id: string; title: string }[]>([]);
   const [copyMessage, setCopyMessage] = useState<string | null>(null);
+  const [augmentedPrompt, setAugmentedPrompt] = useState("");
+  const [promptLoading, setPromptLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const promptTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const loadSession = useCallback(async (sessionId: string) => {
     const detail = await getSession(projectId, sessionId);
@@ -167,6 +115,28 @@ export default function SessionPanel({ projectId, onTopicsChanged }: SessionPane
     };
   }, [projectId, loadSession]);
 
+  useEffect(() => {
+    if (!session) return;
+    if (promptTimer.current) clearTimeout(promptTimer.current);
+    setPromptLoading(true);
+    promptTimer.current = setTimeout(() => {
+      void getSessionIntakePrompt(projectId, session.id, sourcePrompt)
+        .then((prompt) => {
+          setAugmentedPrompt(prompt);
+        })
+        .catch((err: Error) => {
+          setAugmentedPrompt("");
+          setStatusMessage(err.message);
+        })
+        .finally(() => {
+          setPromptLoading(false);
+        });
+    }, 400);
+    return () => {
+      if (promptTimer.current) clearTimeout(promptTimer.current);
+    };
+  }, [projectId, session, sourcePrompt]);
+
   const acceptedCount =
     session?.proposals.filter((p) => p.state === "accepted").length ?? 0;
 
@@ -199,17 +169,14 @@ export default function SessionPanel({ projectId, onTopicsChanged }: SessionPane
     }, 600);
   };
 
-  const handleGenerateIntakePrompt = async () => {
-    if (!session) return;
-    const text = buildIntakePrompt(sourcePrompt, session.id, projectId);
+  const handleCopyIntakePrompt = async () => {
+    if (!session || !augmentedPrompt) return;
     try {
-      await navigator.clipboard.writeText(text);
-      setCopyMessage(
-        "Prompt copied — paste into ChatGPT/Claude. Tell it: reply with JSON only, no markdown.",
-      );
+      await navigator.clipboard.writeText(augmentedPrompt);
+      setCopyMessage("Augmented prompt copied — paste into ChatGPT/Claude.");
     } catch {
-      setCopyMessage("Could not copy — check the browser console.");
-      console.log(text);
+      setCopyMessage("Could not copy — select the prompt text below and copy manually.");
+      console.log(augmentedPrompt);
     }
   };
 
@@ -252,8 +219,12 @@ export default function SessionPanel({ projectId, onTopicsChanged }: SessionPane
       setSession(detail);
       const result = await applySession(projectId, session.id);
       onTopicsChanged();
+      setAppliedTopics(result.created.map((topic) => ({ id: topic.id, title: topic.title })));
+      if (result.created.length > 0) {
+        onSelectTopic(result.created[0].id);
+      }
       setStatusMessage(
-        `Demo complete — imported ${detail.proposals.length} proposals, applied ${result.created.length} topic scaffold(s).`,
+        `Demo complete — imported ${detail.proposals.length} proposals, applied ${result.created.length} topic scaffold(s). Pick a topic below to expand it.`,
       );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Demo failed");
@@ -270,7 +241,13 @@ export default function SessionPanel({ projectId, onTopicsChanged }: SessionPane
     try {
       const result = await applySession(projectId, session.id);
       onTopicsChanged();
-      setStatusMessage(`Applied session — created ${result.created.length} topic scaffold(s).`);
+      setAppliedTopics(result.created.map((topic) => ({ id: topic.id, title: topic.title })));
+      if (result.created.length > 0) {
+        onSelectTopic(result.created[0].id);
+      }
+      setStatusMessage(
+        `Applied session — created ${result.created.length} topic scaffold(s). Click a topic in Atlas above to expand it.`,
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Apply failed");
     } finally {
@@ -387,13 +364,36 @@ export default function SessionPanel({ projectId, onTopicsChanged }: SessionPane
             boxSizing: "border-box",
           }}
         />
+        <label htmlFor="augmented-prompt" style={{ display: "block", fontSize: "13px", fontWeight: 600, marginTop: "14px" }}>
+          2. Augmented prompt (for external LLM)
+        </label>
+        <p style={{ margin: "4px 0 0", fontSize: "12px", color: "#6b7280" }}>
+          Includes your idea, project context, existing atlas areas, and strict JSON-only output rules.
+        </p>
+        <textarea
+          id="augmented-prompt"
+          readOnly
+          value={promptLoading ? "Building augmented prompt…" : augmentedPrompt}
+          rows={12}
+          style={{
+            width: "100%",
+            marginTop: "6px",
+            padding: "8px",
+            fontSize: "12px",
+            fontFamily: "monospace",
+            boxSizing: "border-box",
+            background: "#f9fafb",
+            color: "#374151",
+          }}
+        />
         <div style={{ display: "flex", gap: "8px", marginTop: "8px", flexWrap: "wrap" }}>
           <button
             type="button"
-            onClick={() => void handleGenerateIntakePrompt()}
+            disabled={!augmentedPrompt || promptLoading}
+            onClick={() => void handleCopyIntakePrompt()}
             style={{ padding: "6px 12px", fontSize: "13px", cursor: "pointer" }}
           >
-            2. Copy LLM prompt
+            Copy augmented prompt
           </button>
         </div>
         {copyMessage && (
@@ -492,7 +492,44 @@ export default function SessionPanel({ projectId, onTopicsChanged }: SessionPane
       </div>
 
       {statusMessage && (
-        <p style={{ margin: "0 0 8px", fontSize: "13px", color: "#059669" }}>{statusMessage}</p>
+        <div
+          style={{
+            margin: "0 0 12px",
+            padding: "12px",
+            background: "#ecfdf5",
+            border: "1px solid #a7f3d0",
+            borderRadius: "8px",
+          }}
+        >
+          <p style={{ margin: 0, fontSize: "13px", color: "#065f46" }}>{statusMessage}</p>
+          {appliedTopics.length > 0 && (
+            <div style={{ marginTop: "10px" }}>
+              <p style={{ margin: "0 0 6px", fontSize: "12px", fontWeight: 600, color: "#047857" }}>
+                Created topics — click to open:
+              </p>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                {appliedTopics.map((topic) => (
+                  <button
+                    key={topic.id}
+                    type="button"
+                    onClick={() => onSelectTopic(topic.id)}
+                    style={{
+                      padding: "4px 10px",
+                      fontSize: "12px",
+                      cursor: "pointer",
+                      background: "#fff",
+                      border: "1px solid #6ee7b7",
+                      borderRadius: "999px",
+                      color: "#047857",
+                    }}
+                  >
+                    {topic.title}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
       )}
       {error && (
         <p style={{ margin: 0, fontSize: "13px", color: "#b91c1c" }}>{error}</p>

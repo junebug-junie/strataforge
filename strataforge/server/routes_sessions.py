@@ -7,6 +7,7 @@ from strataforge.core.apply_engine import ApplyConflictError, apply_session
 from strataforge.core.proposal_store import add_proposal, load_proposal
 from strataforge.core.session_store import create_session, list_sessions, load_session, save_session
 from strataforge.llm.manual_import import ProposalBundleError, parse_proposal_bundle
+from strataforge.llm.prompts import build_intake_prompt
 from strataforge.server.deps import resolve_project_paths
 
 router = APIRouter(prefix="/api/projects/{project_id}/sessions", tags=["sessions"])
@@ -31,6 +32,12 @@ class ImportProposalsResponse(BaseModel):
 
 class ApplySessionResponse(BaseModel):
     created: list[dict]
+
+
+class IntakePromptResponse(BaseModel):
+    command: str = "intake"
+    session_id: str
+    prompt: str
 
 
 class UpdateSessionRequest(BaseModel):
@@ -77,6 +84,24 @@ def get_session_detail(project_id: str, session_id: str) -> dict:
     data = session.model_dump(mode="json")
     data["proposals"] = proposals
     return data
+
+
+@router.get("/{session_id}/prompts/intake", response_model=IntakePromptResponse)
+def get_intake_prompt(
+    project_id: str,
+    session_id: str,
+    source_prompt: str | None = None,
+) -> IntakePromptResponse:
+    paths = resolve_project_paths(project_id)
+    try:
+        session = load_session(paths, session_id)
+    except (FileNotFoundError, KeyError, ValueError):
+        raise HTTPException(status_code=404, detail=f"Session not found: {session_id}") from None
+
+    saved_prompt = session.inputs.get("source_prompt", "")
+    idea = source_prompt if source_prompt is not None else str(saved_prompt or "")
+    prompt = build_intake_prompt(paths, session_id=session_id, source_prompt=idea)
+    return IntakePromptResponse(session_id=session_id, prompt=prompt)
 
 
 @router.put("/{session_id}")

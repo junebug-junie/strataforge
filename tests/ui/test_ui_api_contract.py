@@ -56,6 +56,20 @@ def test_ui_session_resume_and_prompt_endpoints(tmp_path, monkeypatch):
         f"/api/projects/{pid}/sessions/{session_id}",
         json={"inputs": {"source_prompt": "Build a design pairing plane"}},
     )
+    intake_prompt = client.get(f"/api/projects/{pid}/sessions/{session_id}/prompts/intake")
+    assert intake_prompt.status_code == 200
+    prompt_text = intake_prompt.json()["prompt"]
+    assert "Build a design pairing plane" in prompt_text
+    assert "topic:runtime" in prompt_text
+    assert '"session_mode": "intake"' in prompt_text
+
+    live_preview = client.get(
+        f"/api/projects/{pid}/sessions/{session_id}/prompts/intake",
+        params={"source_prompt": "I want to build a cat app"},
+    )
+    assert live_preview.status_code == 200
+    assert "I want to build a cat app" in live_preview.json()["prompt"]
+
     imported = client.post(
         f"/api/projects/{pid}/sessions/{session_id}/import",
         json={

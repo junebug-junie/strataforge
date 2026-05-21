@@ -89,7 +89,46 @@ export default function AtlasTree({ topics, selectedTopicId, onSelect }: AtlasTr
   const roots = buildTree(topics);
 
   if (topics.length === 0) {
-    return <p style={{ margin: 0, padding: "8px", color: "#666" }}>No topics yet</p>;
+    return <p style={{ margin: 0, color: "#666" }}>No topics yet</p>;
+  }
+
+  const flatOnly = roots.every((node) => node.children.length === 0);
+
+  if (flatOnly) {
+    return (
+      <nav aria-label="Atlas tree">
+        <ul
+          style={{
+            listStyle: "none",
+            margin: 0,
+            padding: 0,
+            display: "flex",
+            flexWrap: "wrap",
+            gap: "6px",
+          }}
+        >
+          {roots.map((node) => (
+            <li key={node.id}>
+              <button
+                type="button"
+                onClick={() => onSelect(node.id)}
+                style={{
+                  padding: "6px 12px",
+                  border: `1px solid ${node.id === selectedTopicId ? "#6366f1" : "#d1d5db"}`,
+                  background: node.id === selectedTopicId ? "#eef2ff" : "#fff",
+                  cursor: "pointer",
+                  fontSize: "13px",
+                  borderRadius: "999px",
+                  color: "#111827",
+                }}
+              >
+                {node.title}
+              </button>
+            </li>
+          ))}
+        </ul>
+      </nav>
+    );
   }
 
   return (

@@ -37,6 +37,37 @@ Output:
 - proposals for other files only
 - next recommended command"""
 
+INTAKE_TEMPLATE = """You are an architecture design partner for StrataForge (manual paste / intake mode).
+
+The human has described an architecture idea. Propose a bounded decomposition into top-level area components.
+
+Do not:
+- redesign unrelated areas
+- duplicate existing atlas areas listed below
+- treat proposals as accepted design
+- accept or apply proposals — the human gates each card in the UI
+
+Distinguish proposals from accepted design. Include rationale and risks for each proposal."""
+
+INTAKE_JSON_SCHEMA = """{
+  "session_mode": "intake",
+  "summary": "Brief summary of proposed decomposition",
+  "proposals": [
+    {
+      "kind": "create_component",
+      "title": "Component Name",
+      "summary": "One-line description",
+      "rationale": "Why this component belongs in the architecture",
+      "proposed_changes": {
+        "area_slug": "01-component-slug",
+        "topic_id": "topic:component-id",
+        "title": "Component Name",
+        "level": "area"
+      }
+    }
+  ]
+}"""
+
 RECONCILIATION_TEMPLATE = """You are reconciling a parent topic with its children.
 
 Read:
@@ -188,6 +219,57 @@ def build_expansion_prompt(paths: ProjectPaths, topic_id: str) -> str:
             context["children_block"],
             _section_heading("Sibling one-liners").strip(),
             context["siblings_block"],
+        ]
+    )
+
+
+def build_intake_prompt(
+    paths: ProjectPaths,
+    session_id: str,
+    source_prompt: str = "",
+) -> str:
+    manifest = load_manifest(paths)
+    idea = source_prompt.strip()
+    if not idea:
+        idea = "(no architecture idea saved yet — the human should describe their idea in StrataForge first)"
+
+    return "\n\n".join(
+        [
+            INTAKE_TEMPLATE,
+            _section_heading("Architecture idea").strip(),
+            idea,
+            _section_heading("Project context").strip(),
+            f"- project_id: {manifest.project_id}",
+            f"- project_title: {manifest.title}",
+            f"- session_id: {session_id}",
+            "- mode: intake",
+            _section_heading("Existing atlas (do not duplicate)").strip(),
+            _manifest_summary(manifest),
+            _section_heading("Output format (STRICT — required for machine import)").strip(),
+            "Your ENTIRE reply must be ONE JSON object and NOTHING else.",
+            "",
+            "FORBIDDEN (import will fail if you include any of these):",
+            "- Markdown code fences (no ``` or ```json)",
+            '- Introductory text ("Sure!", "Here is the JSON:", "Below is...")',
+            "- Explanations, summaries, or bullet lists outside the JSON",
+            "- Trailing commentary after the closing brace",
+            "",
+            "REQUIRED:",
+            "- The first character of your reply MUST be {",
+            "- The last character of your reply MUST be }",
+            "- Valid JSON only — the human copies your whole reply into an import field",
+            "",
+            "Schema to follow exactly:",
+            "",
+            INTAKE_JSON_SCHEMA,
+            "",
+            "Content rules:",
+            "- Propose 3–8 create_component items for this intake.",
+            "- Use snake-case area_slug prefixes like 01-session-runtime.",
+            "- topic_id must start with topic: and be unique within the bundle.",
+            "- Do not accept or apply proposals — the human gates each card in the UI.",
+            "",
+            "Reply with the JSON object now. No other text.",
         ]
     )
 

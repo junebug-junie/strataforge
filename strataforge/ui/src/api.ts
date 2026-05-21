@@ -285,6 +285,22 @@ export async function listSessions(
   return r.json();
 }
 
+export async function getSessionIntakePrompt(
+  projectId: string,
+  sessionId: string,
+  sourcePrompt?: string,
+): Promise<string> {
+  const query =
+    sourcePrompt !== undefined
+      ? `?source_prompt=${encodeURIComponent(sourcePrompt)}`
+      : "";
+  const r = await apiFetch(
+    `${API_BASE}/api/projects/${encodeURIComponent(projectId)}/sessions/${encodeURIComponent(sessionId)}/prompts/intake${query}`,
+  );
+  const data = (await r.json()) as { prompt: string };
+  return data.prompt;
+}
+
 export async function getTopicPrompt(
   projectId: string,
   topicId: string,

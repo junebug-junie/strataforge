@@ -5,12 +5,14 @@ interface PairingPlaneProps {
   projectId: string;
   selectedTopicId: string | null;
   onTopicsChanged: () => void;
+  onSelectTopic: (topicId: string) => void;
 }
 
 export default function PairingPlane({
   projectId,
   selectedTopicId,
   onTopicsChanged,
+  onSelectTopic,
 }: PairingPlaneProps) {
   return (
     <div
@@ -27,7 +29,11 @@ export default function PairingPlane({
         <h2 style={{ margin: "0 0 12px", fontSize: "14px", fontWeight: 600, color: "#374151" }}>
           Active Pairing Session
         </h2>
-        <SessionPanel projectId={projectId} onTopicsChanged={onTopicsChanged} />
+        <SessionPanel
+          projectId={projectId}
+          onTopicsChanged={onTopicsChanged}
+          onSelectTopic={onSelectTopic}
+        />
       </div>
 
       {selectedTopicId && (

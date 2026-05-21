@@ -123,17 +123,9 @@ export default function ProjectShell({ selectedTopicId, onSelectTopic }: Project
   }
 
   return (
-    <div style={{ display: "flex", minHeight: "100vh", fontFamily: "system-ui, sans-serif" }}>
-      <aside
-        style={{
-          width: "260px",
-          flexShrink: 0,
-          borderRight: "1px solid #ddd",
-          padding: "12px",
-          background: "#fafafa",
-        }}
-      >
-        <header style={{ marginBottom: "12px" }}>
+    <div className="app-shell">
+      <header className="app-topbar">
+        <div style={{ minWidth: "200px", flex: "1 1 220px" }}>
           <label htmlFor="project-select" style={{ display: "block", fontSize: "12px", color: "#666" }}>
             Project
           </label>
@@ -149,92 +141,92 @@ export default function ProjectShell({ selectedTopicId, onSelectTopic }: Project
               </option>
             ))}
           </select>
-          {!showNewProject ? (
+        </div>
+        {!showNewProject ? (
+          <button
+            type="button"
+            onClick={() => setShowNewProject(true)}
+            style={{
+              padding: "6px 0",
+              fontSize: "12px",
+              color: "#1e40af",
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+            }}
+          >
+            + New project
+          </button>
+        ) : (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", alignItems: "center" }}>
+            <input
+              type="text"
+              value={newTitle}
+              onChange={(e) => setNewTitle(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") void handleCreateAnother();
+              }}
+              placeholder="Project title"
+              disabled={creating}
+              style={{ padding: "6px", fontSize: "12px", minWidth: "180px" }}
+            />
             <button
               type="button"
-              onClick={() => setShowNewProject(true)}
-              style={{
-                marginTop: "8px",
-                padding: 0,
-                fontSize: "12px",
-                color: "#1e40af",
-                background: "none",
-                border: "none",
-                cursor: "pointer",
-              }}
+              disabled={creating}
+              onClick={() => void handleCreateAnother()}
+              style={{ fontSize: "12px", padding: "4px 8px", cursor: "pointer" }}
             >
-              + New project
+              Create
             </button>
-          ) : (
-            <div style={{ marginTop: "8px" }}>
-              <input
-                type="text"
-                value={newTitle}
-                onChange={(e) => setNewTitle(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") void handleCreateAnother();
-                }}
-                placeholder="Project title"
-                disabled={creating}
-                style={{ width: "100%", padding: "6px", fontSize: "12px", boxSizing: "border-box" }}
-              />
-              <div style={{ display: "flex", gap: "6px", marginTop: "6px" }}>
-                <button
-                  type="button"
-                  disabled={creating}
-                  onClick={() => void handleCreateAnother()}
-                  style={{ fontSize: "12px", padding: "4px 8px", cursor: "pointer" }}
-                >
-                  Create
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowNewProject(false);
-                    setNewTitle("");
-                  }}
-                  style={{ fontSize: "12px", padding: "4px 8px", cursor: "pointer" }}
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setShowNewProject(false);
+                setNewTitle("");
+              }}
+              style={{ fontSize: "12px", padding: "4px 8px", cursor: "pointer" }}
+            >
+              Cancel
+            </button>
+          </div>
+        )}
+      </header>
+
+      <div className="app-body">
+        <main className="app-main">
+          <section className="app-atlas">
+            <h2 style={{ margin: "0 0 8px", fontSize: "14px", fontWeight: 600 }}>Atlas</h2>
+            <p style={{ margin: "0 0 8px", fontSize: "12px", color: "#6b7280" }}>
+              {topics.length === 0
+                ? "No topics yet — complete intake and Apply session to populate the atlas."
+                : `${topics.length} topic(s) — click one to open it below.`}
+            </p>
+            <AtlasTree
+              topics={topics}
+              selectedTopicId={selectedTopicId}
+              onSelect={onSelectTopic}
+            />
+          </section>
+
+          {projectId && (
+            <PairingPlane
+              projectId={projectId}
+              selectedTopicId={selectedTopicId}
+              onTopicsChanged={refreshTopics}
+              onSelectTopic={onSelectTopic}
+            />
           )}
-        </header>
+        </main>
 
-        <h2 style={{ margin: "0 0 8px", fontSize: "14px", fontWeight: 600 }}>Atlas Tree</h2>
-        <AtlasTree
-          topics={topics}
-          selectedTopicId={selectedTopicId}
-          onSelect={onSelectTopic}
-        />
-      </aside>
-
-      {projectId && (
-        <PairingPlane
-          projectId={projectId}
-          selectedTopicId={selectedTopicId}
-          onTopicsChanged={refreshTopics}
-        />
-      )}
-
-      {projectId && (
-        <aside
-          style={{
-            width: "260px",
-            flexShrink: 0,
-            padding: "16px",
-            background: "#fafafa",
-            borderLeft: "1px solid #ddd",
-            overflowY: "auto",
-          }}
-        >
-          <CoherenceRadar
-            projectId={projectId}
-            onSelectTopic={(topicId) => onSelectTopic(topicId)}
-          />
-        </aside>
-      )}
+        {projectId && (
+          <aside className="app-radar">
+            <CoherenceRadar
+              projectId={projectId}
+              onSelectTopic={(topicId) => onSelectTopic(topicId)}
+            />
+          </aside>
+        )}
+      </div>
 
       {error && (
         <div
@@ -249,6 +241,7 @@ export default function ProjectShell({ selectedTopicId, onSelectTopic }: Project
             borderRadius: "8px",
             fontSize: "13px",
             maxWidth: "320px",
+            zIndex: 10,
           }}
         >
           {error}
