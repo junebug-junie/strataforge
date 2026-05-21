@@ -1,8 +1,15 @@
 import { useCallback, useEffect, useState } from "react";
-import { listProjects, listTopics, type ProjectSummary, type TopicNode } from "../api";
+import {
+  createProject,
+  listProjects,
+  listTopics,
+  type ProjectSummary,
+  type TopicNode,
+} from "../api";
 import AtlasTree from "./AtlasTree";
 import CoherenceRadar from "./CoherenceRadar";
 import PairingPlane from "./PairingPlane";
+import ProjectOnboarding from "./ProjectOnboarding";
 
 interface ProjectShellProps {
   selectedTopicId: string | null;
@@ -15,31 +22,30 @@ export default function ProjectShell({ selectedTopicId, onSelectTopic }: Project
   const [topics, setTopics] = useState<TopicNode[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showNewProject, setShowNewProject] = useState(false);
+  const [newTitle, setNewTitle] = useState("");
+  const [creating, setCreating] = useState(false);
 
-  useEffect(() => {
-    let cancelled = false;
+  const loadProjects = useCallback(async () => {
     setLoading(true);
     setError(null);
-
-    listProjects()
-      .then((data) => {
-        if (cancelled) return;
-        setProjects(data);
-        if (data.length > 0) {
-          setProjectId((current) => current ?? data[0].project_id);
-        }
-      })
-      .catch((err: Error) => {
-        if (!cancelled) setError(err.message);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
+    try {
+      const data = await listProjects();
+      setProjects(data);
+      setProjectId((current) => {
+        if (current && data.some((p) => p.project_id === current)) return current;
+        return data.length > 0 ? data[0].project_id : null;
       });
-
-    return () => {
-      cancelled = true;
-    };
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load projects");
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    void loadProjects();
+  }, [loadProjects]);
 
   const refreshTopics = useCallback(() => {
     if (!projectId) return;
@@ -82,16 +88,38 @@ export default function ProjectShell({ selectedTopicId, onSelectTopic }: Project
     onSelectTopic(null);
   };
 
+  const handleProjectCreated = (project: ProjectSummary) => {
+    setProjects((prev) => {
+      if (prev.some((p) => p.project_id === project.project_id)) return prev;
+      return [...prev, project];
+    });
+    setProjectId(project.project_id);
+    setShowNewProject(false);
+    setNewTitle("");
+    onSelectTopic(null);
+  };
+
+  const handleCreateAnother = async () => {
+    const trimmed = newTitle.trim();
+    if (!trimmed) return;
+    setCreating(true);
+    setError(null);
+    try {
+      const project = await createProject(trimmed);
+      handleProjectCreated(project);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not create project");
+    } finally {
+      setCreating(false);
+    }
+  };
+
   if (loading) {
     return <p style={{ padding: "16px" }}>Loading projects…</p>;
   }
 
-  if (error) {
-    return <p style={{ padding: "16px", color: "#b91c1c" }}>{error}</p>;
-  }
-
   if (projects.length === 0) {
-    return <p style={{ padding: "16px" }}>No projects found. Run strata init to create one.</p>;
+    return <ProjectOnboarding onCreated={handleProjectCreated} />;
   }
 
   return (
@@ -121,6 +149,57 @@ export default function ProjectShell({ selectedTopicId, onSelectTopic }: Project
               </option>
             ))}
           </select>
+          {!showNewProject ? (
+            <button
+              type="button"
+              onClick={() => setShowNewProject(true)}
+              style={{
+                marginTop: "8px",
+                padding: 0,
+                fontSize: "12px",
+                color: "#1e40af",
+                background: "none",
+                border: "none",
+                cursor: "pointer",
+              }}
+            >
+              + New project
+            </button>
+          ) : (
+            <div style={{ marginTop: "8px" }}>
+              <input
+                type="text"
+                value={newTitle}
+                onChange={(e) => setNewTitle(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") void handleCreateAnother();
+                }}
+                placeholder="Project title"
+                disabled={creating}
+                style={{ width: "100%", padding: "6px", fontSize: "12px", boxSizing: "border-box" }}
+              />
+              <div style={{ display: "flex", gap: "6px", marginTop: "6px" }}>
+                <button
+                  type="button"
+                  disabled={creating}
+                  onClick={() => void handleCreateAnother()}
+                  style={{ fontSize: "12px", padding: "4px 8px", cursor: "pointer" }}
+                >
+                  Create
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowNewProject(false);
+                    setNewTitle("");
+                  }}
+                  style={{ fontSize: "12px", padding: "4px 8px", cursor: "pointer" }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
         </header>
 
         <h2 style={{ margin: "0 0 8px", fontSize: "14px", fontWeight: 600 }}>Atlas Tree</h2>
@@ -155,6 +234,25 @@ export default function ProjectShell({ selectedTopicId, onSelectTopic }: Project
             onSelectTopic={(topicId) => onSelectTopic(topicId)}
           />
         </aside>
+      )}
+
+      {error && (
+        <div
+          style={{
+            position: "fixed",
+            bottom: "16px",
+            right: "16px",
+            background: "#fef2f2",
+            border: "1px solid #fecaca",
+            color: "#b91c1c",
+            padding: "10px 14px",
+            borderRadius: "8px",
+            fontSize: "13px",
+            maxWidth: "320px",
+          }}
+        >
+          {error}
+        </div>
       )}
     </div>
   );

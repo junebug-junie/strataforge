@@ -122,6 +122,21 @@ export async function listProjects(): Promise<ProjectSummary[]> {
   return r.json();
 }
 
+export async function createProject(title: string, slug?: string): Promise<ProjectSummary> {
+  const r = await apiFetch(`${API_BASE}/api/projects`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ title, slug }),
+  });
+  const created = (await r.json()) as { project_id: string; title: string; path: string };
+  return {
+    project_id: created.project_id,
+    title: created.title,
+    path: created.path,
+    status: "active",
+  };
+}
+
 export async function listTopics(projectId: string): Promise<TopicNode[]> {
   const r = await apiFetch(`${API_BASE}/api/projects/${encodeURIComponent(projectId)}/topics`);
   return r.json();

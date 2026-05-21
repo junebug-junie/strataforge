@@ -31,7 +31,7 @@ sudo tailscale serve --bg --https=443 --set-path=/strataforge http://127.0.0.1:8
 
 Open: `https://<your-tailscale-host>/strataforge/` (note trailing slash)
 
-Tailscale strips the `/strataforge` prefix before forwarding to port 8788, so nginx serves the app at `/` internally while the browser still requests assets at `/strataforge/assets/...`.
+On first visit, the UI prompts you to **create a project** — no CLI required.
 
 To remove later: `sudo tailscale serve reset` (or `tailscale serve status` to inspect).
 
