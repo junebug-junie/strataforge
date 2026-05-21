@@ -185,6 +185,58 @@ def prompt_reconcile_parent(
         raise typer.Exit(1)
 
 
+@app.command("radar")
+def radar_cmd(path: str = "."):
+    from strataforge.core.paths import ProjectPaths
+    from strataforge.llm.coherence import scan_project
+
+    paths = ProjectPaths(Path(path))
+    items = scan_project(paths)
+    if not items:
+        typer.echo("No coherence pressure detected.")
+        return
+    for item in items:
+        reasons = ",".join(item.reason_codes)
+        typer.echo(
+            f"{item.score}\t{item.severity}\t{item.topic_id}\t{item.title}\t{reasons}"
+        )
+
+
+@app.command("status")
+def status_cmd(path: str = "."):
+    from strataforge.core.manifest import load_manifest
+    from strataforge.core.paths import ProjectPaths
+    from strataforge.llm.coherence import project_status_counts
+
+    paths = ProjectPaths(Path(path))
+    manifest = load_manifest(paths)
+    typer.echo(f"project: {manifest.project_id}")
+    typer.echo(f"title: {manifest.title}")
+    counts = project_status_counts(paths)
+    if not counts:
+        typer.echo("topics: 0")
+        return
+    typer.echo(f"topics: {sum(counts.values())}")
+    for status, count in sorted(counts.items()):
+        typer.echo(f"  {status}: {count}")
+
+
+@app.command("gaps")
+def gaps_cmd(path: str = "."):
+    from strataforge.core.paths import ProjectPaths
+    from strataforge.llm.coherence import project_gaps
+
+    paths = ProjectPaths(Path(path))
+    gaps = project_gaps(paths)
+    if not gaps:
+        typer.echo("No design gaps flagged.")
+        return
+    for category, topic_ids in sorted(gaps.items()):
+        typer.echo(f"{category}:")
+        for topic_id in topic_ids:
+            typer.echo(f"  - {topic_id}")
+
+
 @app.command("apply")
 def apply_cmd(
     session_id: str,
