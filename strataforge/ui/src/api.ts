@@ -88,6 +88,18 @@ export interface ApplySessionResult {
   created: TopicRecord[];
 }
 
+export interface RadarItem {
+  id: string;
+  topic_id: string;
+  title: string;
+  severity: string;
+  score: number;
+  reason_codes: string[];
+  summary: string;
+  recommended_commands: string[];
+  created_at: string;
+}
+
 async function apiFetch(url: string, init?: RequestInit): Promise<Response> {
   const r = await fetch(url, init);
   if (!r.ok) {
@@ -240,4 +252,19 @@ export function deferProposal(projectId: string, proposalId: string, note = "") 
 
 export function outOfScopeProposal(projectId: string, proposalId: string, note = "") {
   return proposalAction(projectId, proposalId, "out-of-scope", note);
+}
+
+export async function listRadar(projectId: string): Promise<RadarItem[]> {
+  const r = await apiFetch(
+    `${API_BASE}/api/projects/${encodeURIComponent(projectId)}/radar`,
+  );
+  return r.json();
+}
+
+export async function scanRadar(projectId: string): Promise<RadarItem[]> {
+  const r = await apiFetch(
+    `${API_BASE}/api/projects/${encodeURIComponent(projectId)}/radar/scan`,
+    { method: "POST" },
+  );
+  return r.json();
 }

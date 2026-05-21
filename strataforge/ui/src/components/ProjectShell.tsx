@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { listProjects, listTopics, type ProjectSummary, type TopicNode } from "../api";
 import AtlasTree from "./AtlasTree";
+import CoherenceRadar from "./CoherenceRadar";
 import PairingPlane from "./PairingPlane";
 
 interface ProjectShellProps {
@@ -138,20 +139,23 @@ export default function ProjectShell({ selectedTopicId, onSelectTopic }: Project
         />
       )}
 
-      <aside
-        style={{
-          width: "240px",
-          flexShrink: 0,
-          padding: "16px",
-          background: "#fafafa",
-          borderLeft: "1px solid #ddd",
-        }}
-      >
-        <h2 style={{ margin: "0 0 8px", fontSize: "14px", fontWeight: 600 }}>Coherence Radar</h2>
-        <p style={{ margin: 0, fontSize: "13px", color: "#6b7280" }}>
-          Radar panel coming soon. Run scan from Task 19.
-        </p>
-      </aside>
+      {projectId && (
+        <aside
+          style={{
+            width: "260px",
+            flexShrink: 0,
+            padding: "16px",
+            background: "#fafafa",
+            borderLeft: "1px solid #ddd",
+            overflowY: "auto",
+          }}
+        >
+          <CoherenceRadar
+            projectId={projectId}
+            onSelectTopic={(topicId) => onSelectTopic(topicId)}
+          />
+        </aside>
+      )}
     </div>
   );
 }
