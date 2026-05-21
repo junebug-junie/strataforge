@@ -31,6 +31,41 @@ const INTAKE_JSON_SCHEMA = `{
   ]
 }`;
 
+function extractJsonFromLlmPaste(text: string): Record<string, unknown> {
+  const trimmed = text.trim();
+  if (!trimmed) throw new Error("Paste is empty");
+
+  try {
+    const parsed: unknown = JSON.parse(trimmed);
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      return parsed as Record<string, unknown>;
+    }
+  } catch {
+    // fall through
+  }
+
+  const fence = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if (fence) {
+    const parsed: unknown = JSON.parse(fence[1].trim());
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      return parsed as Record<string, unknown>;
+    }
+  }
+
+  const start = trimmed.indexOf("{");
+  const end = trimmed.lastIndexOf("}");
+  if (start >= 0 && end > start) {
+    const parsed: unknown = JSON.parse(trimmed.slice(start, end + 1));
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      return parsed as Record<string, unknown>;
+    }
+  }
+
+  throw new Error(
+    "Could not find a JSON object. Paste the LLM's answer, not the prompt you sent it.",
+  );
+}
+
 function buildIntakePrompt(sourcePrompt: string, sessionId: string, projectId: string): string {
   return `You are an architecture design partner for StrataForge (manual paste / intake mode).
 
@@ -46,17 +81,32 @@ ${sourcePrompt.trim() || "(no source prompt saved yet — paste the idea in the 
 - session_id: ${sessionId}
 - mode: intake
 
-## Required output
+## Output format (STRICT — required for machine import)
 
-Return ONLY valid JSON matching this schema (no markdown fences):
+Your ENTIRE reply must be ONE JSON object and NOTHING else.
+
+FORBIDDEN (import will fail if you include any of these):
+- Markdown code fences (no \`\`\` or \`\`\`json)
+- Introductory text ("Sure!", "Here is the JSON:", "Below is...")
+- Explanations, summaries, or bullet lists outside the JSON
+- Trailing commentary after the closing brace
+
+REQUIRED:
+- The first character of your reply MUST be {
+- The last character of your reply MUST be }
+- Valid JSON only — the human copies your whole reply into an import field
+
+Schema to follow exactly:
 
 ${INTAKE_JSON_SCHEMA}
 
-Rules:
-- Propose 3–8 create_component items for a new project intake.
+Content rules:
+- Propose 3–8 create_component items for this intake.
 - Use snake-case area_slug prefixes like 01-session-runtime.
 - topic_id must start with topic: and be unique within the bundle.
-- Do not accept or apply proposals — the human gates each card in the UI.`;
+- Do not accept or apply proposals — the human gates each card in the UI.
+
+Reply with the JSON object now. No other text.`;
 }
 
 interface SessionPanelProps {
@@ -66,8 +116,8 @@ interface SessionPanelProps {
 
 const STEPS = [
   "Describe your architecture idea",
-  "Copy prompt → run in your LLM (external)",
-  "Paste the LLM's JSON response below",
+  "Copy prompt → paste into ChatGPT/Claude (it must reply with raw JSON only)",
+  "Copy the LLM's entire reply back here (we accept ```json fences too)",
   "Accept proposals, then Apply session",
 ];
 
@@ -154,7 +204,9 @@ export default function SessionPanel({ projectId, onTopicsChanged }: SessionPane
     const text = buildIntakePrompt(sourcePrompt, session.id, projectId);
     try {
       await navigator.clipboard.writeText(text);
-      setCopyMessage("Prompt copied — paste it into ChatGPT/Claude, not the JSON box below.");
+      setCopyMessage(
+        "Prompt copied — paste into ChatGPT/Claude. Tell it: reply with JSON only, no markdown.",
+      );
     } catch {
       setCopyMessage("Could not copy — check the browser console.");
       console.log(text);
@@ -351,10 +403,11 @@ export default function SessionPanel({ projectId, onTopicsChanged }: SessionPane
 
       <div style={{ marginBottom: "14px" }}>
         <label htmlFor="proposal-json" style={{ display: "block", fontSize: "13px", fontWeight: 600 }}>
-          3. Paste LLM JSON response
+          3. Paste the LLM&apos;s reply
         </label>
         <p style={{ margin: "4px 0 0", fontSize: "12px", color: "#6b7280" }}>
-          Paste the JSON your LLM returns — not the prompt you sent it.
+          Copy the LLM&apos;s whole answer here — the prompt tells it to respond with JSON only.
+          If it wraps output in ```json fences anyway, that&apos;s fine.
         </p>
         <textarea
           id="proposal-json"
@@ -377,10 +430,10 @@ export default function SessionPanel({ projectId, onTopicsChanged }: SessionPane
             disabled={busy || !proposalJson.trim()}
             onClick={() => {
               try {
-                const bundle = JSON.parse(proposalJson) as Record<string, unknown>;
+                const bundle = extractJsonFromLlmPaste(proposalJson);
                 void handleImportProposals(bundle);
-              } catch {
-                setError("Invalid JSON — paste the LLM response object, not the prompt text.");
+              } catch (err) {
+                setError(err instanceof Error ? err.message : "Import failed");
               }
             }}
             style={{ padding: "6px 12px", fontSize: "13px", cursor: "pointer" }}

@@ -1,8 +1,47 @@
+import json
+import re
 from typing import Any
 
 
 class ProposalBundleError(ValueError):
     """Raised when pasted proposal JSON is malformed or incomplete."""
+
+
+def parse_llm_paste_text(text: str) -> dict[str, Any]:
+    """Extract a proposal bundle object from raw LLM paste (JSON, fenced, or embedded)."""
+    trimmed = text.strip()
+    if not trimmed:
+        raise ProposalBundleError("Paste is empty")
+
+    try:
+        parsed = json.loads(trimmed)
+        if isinstance(parsed, dict):
+            return parsed
+    except json.JSONDecodeError:
+        pass
+
+    fence_match = re.search(r"```(?:json)?\s*([\s\S]*?)```", trimmed, re.IGNORECASE)
+    if fence_match:
+        try:
+            parsed = json.loads(fence_match.group(1).strip())
+            if isinstance(parsed, dict):
+                return parsed
+        except json.JSONDecodeError as exc:
+            raise ProposalBundleError(f"JSON inside markdown fence is invalid: {exc}") from exc
+
+    start = trimmed.find("{")
+    end = trimmed.rfind("}")
+    if start >= 0 and end > start:
+        try:
+            parsed = json.loads(trimmed[start : end + 1])
+            if isinstance(parsed, dict):
+                return parsed
+        except json.JSONDecodeError as exc:
+            raise ProposalBundleError(f"Could not parse JSON object from paste: {exc}") from exc
+
+    raise ProposalBundleError(
+        "Could not find a JSON object. Paste the LLM response (JSON only), not the prompt you sent."
+    )
 
 
 def parse_proposal_bundle(raw: dict[str, Any]) -> dict[str, Any]:
