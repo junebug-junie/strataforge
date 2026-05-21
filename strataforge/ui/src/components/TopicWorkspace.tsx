@@ -1,9 +1,9 @@
-import { useCallback, useState, type CSSProperties } from "react";
+import { useCallback, type CSSProperties } from "react";
 import { getTopicPrompt } from "../api";
-import ErrorBoundary from "./ErrorBoundary";
 import LocalGraph from "./LocalGraph";
 import TopicContextPanel from "./TopicContextPanel";
 import TopicEditor from "./TopicEditor";
+import { useToast } from "./Toast";
 
 interface TopicWorkspaceProps {
   projectId: string;
@@ -20,24 +20,21 @@ export default function TopicWorkspace({
   onUpdated,
   onSelectTopic,
 }: TopicWorkspaceProps) {
-  const [actionMessage, setActionMessage] = useState<string | null>(null);
-  const [actionError, setActionError] = useState<string | null>(null);
+  const notify = useToast();
 
   const copyExpand = useCallback(async () => {
-    setActionMessage(null);
-    setActionError(null);
+    notify("Copying expansion prompt…", "info");
     try {
       const prompt = await getTopicPrompt(projectId, topicId, "expand");
       await navigator.clipboard.writeText(prompt);
-      setActionMessage("Expansion prompt copied to clipboard.");
+      notify("Expansion prompt copied to clipboard.", "success");
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : "Failed to copy prompt");
+      notify(err instanceof Error ? err.message : "Failed to copy prompt", "error");
     }
-  }, [projectId, topicId]);
+  }, [projectId, topicId, notify]);
 
   const stubAction = (label: string) => {
-    setActionError(null);
-    setActionMessage(`${label} — coming soon (use expansion + link session).`);
+    notify(`${label} — coming soon (use expansion + link session).`, "info");
   };
 
   return (
@@ -73,12 +70,6 @@ export default function TopicWorkspace({
         <button type="button" onClick={() => stubAction("Boundary check")} style={actionBtnStyle}>
           Boundary check
         </button>
-        {actionMessage && (
-          <span style={{ fontSize: "12px", color: "#059669", alignSelf: "center" }}>{actionMessage}</span>
-        )}
-        {actionError && (
-          <span style={{ fontSize: "12px", color: "#b91c1c", alignSelf: "center" }}>{actionError}</span>
-        )}
       </div>
 
       <div
@@ -102,20 +93,15 @@ export default function TopicWorkspace({
           <div style={{ padding: "8px 12px", borderBottom: "1px solid #eee", fontSize: "12px", fontWeight: 600 }}>
             Local graph (1-hop)
           </div>
-          <div className="topic-workspace-graph" style={{ flex: 1, minHeight: "180px" }}>
-            <ErrorBoundary
-              fallback={
-                <p style={{ margin: 0, padding: "12px", fontSize: "12px", color: "#6b7280" }}>
-                  Graph unavailable — structure panel below still works.
-                </p>
-              }
-            >
-              <LocalGraph
-                projectId={projectId}
-                topicId={topicId}
-                onSelectTopic={onSelectTopic}
-              />
-            </ErrorBoundary>
+          <div
+            className="topic-workspace-graph"
+            style={{ flex: "0 0 auto", maxHeight: "220px", overflowY: "auto" }}
+          >
+            <LocalGraph
+              projectId={projectId}
+              topicId={topicId}
+              onSelectTopic={onSelectTopic}
+            />
           </div>
           <TopicContextPanel
             projectId={projectId}

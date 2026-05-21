@@ -23,17 +23,7 @@ export default function PairingPlane({
   const viewMode: PairingViewMode = selectedTopicId ? "topic-focus" : "session-focus";
 
   return (
-    <div
-      style={{
-        flex: 1,
-        display: "flex",
-        flexDirection: "column",
-        width: "100%",
-        minWidth: 0,
-        minHeight: 0,
-        overflow: "hidden",
-      }}
-    >
+    <div className="pairing-plane" style={{ display: "flex", flexDirection: "column", width: "100%" }}>
       {viewMode === "topic-focus" && selectedTopicId && (
         <TopicWorkspace
           key={selectedTopicId}

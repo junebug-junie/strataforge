@@ -154,6 +154,13 @@ body {
   min-height: min(480px, 55vh);
 }
 
+.pairing-plane {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  z-index: 1;
+}
+
 .topic-workspace-header {
   flex-shrink: 0;
   padding: 14px 16px;

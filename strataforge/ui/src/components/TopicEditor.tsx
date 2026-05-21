@@ -6,6 +6,7 @@ import {
   type CoverageFlags,
   type TopicDetail,
 } from "../api";
+import { useToast } from "./Toast";
 
 const COVERAGE_BADGES: { key: keyof CoverageFlags; label: string }[] = [
   { key: "concept_addressed", label: "Concept addressed" },
@@ -30,6 +31,7 @@ export default function TopicEditor({ projectId, topicId, onUpdated }: TopicEdit
   const [actionError, setActionError] = useState<string | null>(null);
   const [promptMessage, setPromptMessage] = useState<string | null>(null);
   const [updating, setUpdating] = useState(false);
+  const notify = useToast();
 
   const loadTopic = useCallback(() => {
     setLoading(true);
@@ -53,16 +55,23 @@ export default function TopicEditor({ projectId, topicId, onUpdated }: TopicEdit
     try {
       const updated = await updateTopic(projectId, topicId, patch, currentCoverage);
       setDetail((prev) => (prev ? { ...prev, topic: updated } : prev));
+      notify("Topic updated.", "success");
       onUpdated?.();
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : "Update failed");
+      const msg = err instanceof Error ? err.message : "Update failed";
+      setActionError(msg);
+      notify(msg, "error");
     } finally {
       setUpdating(false);
     }
   };
 
   const handleOutOfScope = () => {
-    if (!detail) return;
+    if (!detail) {
+      notify(loading ? "Still loading topic…" : "Topic not loaded yet", "error");
+      return;
+    }
+    notify("Marking out of scope…", "info");
     void applyUpdate(
       {
         review_state: "out_of_scope",
@@ -73,7 +82,11 @@ export default function TopicEditor({ projectId, topicId, onUpdated }: TopicEdit
   };
 
   const handleNeedsDesign = () => {
-    if (!detail) return;
+    if (!detail) {
+      notify(loading ? "Still loading topic…" : "Topic not loaded yet", "error");
+      return;
+    }
+    notify("Setting needs design…", "info");
     void applyUpdate(
       { coverage: { ...detail.topic.coverage, needs_design: true } },
       detail.topic.coverage,
@@ -81,18 +94,27 @@ export default function TopicEditor({ projectId, topicId, onUpdated }: TopicEdit
   };
 
   const handleExecutionReady = () => {
+    if (!detail) {
+      notify(loading ? "Still loading topic…" : "Topic not loaded yet", "error");
+      return;
+    }
+    notify("Promoting to execution ready…", "info");
     void applyUpdate({ status: "execution_ready" });
   };
 
   const copyPrompt = async (command: "expand" | "reconcile-parent", label: string) => {
     setPromptMessage(null);
     setActionError(null);
+    notify(`Copying ${label.toLowerCase()}…`, "info");
     try {
       const prompt = await getTopicPrompt(projectId, topicId, command);
       await navigator.clipboard.writeText(prompt);
       setPromptMessage(`${label} copied to clipboard.`);
+      notify(`${label} copied to clipboard.`, "success");
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : "Failed to copy prompt");
+      const msg = err instanceof Error ? err.message : "Failed to copy prompt";
+      setActionError(msg);
+      notify(msg, "error");
     }
   };
 

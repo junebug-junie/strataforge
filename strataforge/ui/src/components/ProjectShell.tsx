@@ -10,6 +10,7 @@ import AtlasTree from "./AtlasTree";
 import CoherenceRadar from "./CoherenceRadar";
 import PairingPlane from "./PairingPlane";
 import ProjectOnboarding from "./ProjectOnboarding";
+import { useToast } from "./Toast";
 
 interface ProjectShellProps {
   selectedTopicId: string | null;
@@ -26,12 +27,17 @@ export default function ProjectShell({ selectedTopicId, onSelectTopic }: Project
   const [newTitle, setNewTitle] = useState("");
   const [creating, setCreating] = useState(false);
   const workspaceRef = useRef<HTMLDivElement>(null);
+  const notify = useToast();
 
   const handleSelectTopic = useCallback(
     (topicId: string | null) => {
       onSelectTopic(topicId);
+      if (topicId) {
+        const title = topics.find((t) => t.id === topicId)?.title ?? topicId;
+        notify(`Opened topic: ${title}`, "success");
+      }
     },
-    [onSelectTopic],
+    [onSelectTopic, topics, notify],
   );
 
   useEffect(() => {
@@ -75,6 +81,7 @@ export default function ProjectShell({ selectedTopicId, onSelectTopic }: Project
 
     let cancelled = false;
     setError(null);
+    setTopics([]);
 
     listTopics(projectId)
       .then((data) => {

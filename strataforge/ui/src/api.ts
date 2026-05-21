@@ -1,5 +1,14 @@
 // Same-origin subpath: UI at /strataforge/, API proxied at /strataforge/api/
-const API_BASE = import.meta.env.VITE_STRATA_API_BASE ?? "/strataforge";
+function resolveApiBase(): string {
+  const configured = import.meta.env.VITE_STRATA_API_BASE as string | undefined;
+  if (configured != null && configured !== "") {
+    return configured.replace(/\/$/, "");
+  }
+  const base = (import.meta.env.BASE_URL as string) || "/strataforge";
+  return base.replace(/\/$/, "") || "";
+}
+
+const API_BASE = resolveApiBase();
 
 export interface ProjectSummary {
   project_id: string;
