@@ -2,7 +2,7 @@ from pathlib import Path
 from datetime import date
 from strataforge.core.paths import ProjectPaths
 from strataforge.core.manifest import load_manifest, save_manifest
-from strataforge.models import TopicRecord, ProjectManifest
+from strataforge.models import CoverageFlags, TopicRecord, ProjectManifest
 from strataforge.parser.frontmatter import dump_topic_file, load_topic_file
 from strataforge.core.status import DesignStatus, ReviewState, ProposalState
 
@@ -90,3 +90,40 @@ def get_topic(paths: ProjectPaths, topic_id: str) -> tuple[TopicRecord, str]:
             topic, body = load_topic_file(text)
             return topic, body
     raise KeyError(topic_id)
+
+
+def _sync_manifest_topic(manifest: ProjectManifest, topic: TopicRecord) -> None:
+    for index, existing in enumerate(manifest.topics):
+        if existing.id == topic.id:
+            manifest.topics[index] = topic
+            return
+    for index, existing in enumerate(manifest.root_areas):
+        if existing.id == topic.id:
+            manifest.root_areas[index] = topic
+            return
+
+
+def update_topic(
+    paths: ProjectPaths,
+    topic_id: str,
+    *,
+    review_state: ReviewState | None = None,
+    status: DesignStatus | None = None,
+    coverage: CoverageFlags | None = None,
+) -> TopicRecord:
+    from strataforge.core.status import assert_status_promotion_allowed
+    topic, body = get_topic(paths, topic_id)
+    if status is not None and status != topic.status:
+        assert_status_promotion_allowed(topic.status, status)
+        topic.status = status
+    if review_state is not None:
+        topic.review_state = review_state
+    if coverage is not None:
+        topic.coverage = coverage
+    topic.updated_at = date.today()
+    file_path = paths.root / topic.path
+    file_path.write_text(dump_topic_file(topic, body))
+    manifest = load_manifest(paths)
+    _sync_manifest_topic(manifest, topic)
+    save_manifest(paths, manifest)
+    return topic

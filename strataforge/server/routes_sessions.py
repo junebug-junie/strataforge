@@ -1,0 +1,115 @@
+from datetime import datetime, timezone
+
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel, Field
+
+from strataforge.core.apply_engine import ApplyConflictError, apply_session
+from strataforge.core.proposal_store import add_proposal, load_proposal
+from strataforge.core.session_store import create_session, load_session
+from strataforge.llm.manual_import import parse_proposal_bundle
+from strataforge.server.deps import resolve_project_paths
+
+router = APIRouter(prefix="/api/projects/{project_id}/sessions", tags=["sessions"])
+
+
+class StartSessionRequest(BaseModel):
+    title: str
+    mode: str = "intake"
+    topic_id: str | None = None
+
+
+class ImportProposalsRequest(BaseModel):
+    session_mode: str | None = None
+    summary: str = ""
+    proposals: list[dict] = Field(default_factory=list)
+
+
+class ImportProposalsResponse(BaseModel):
+    count: int
+    proposals: list[dict]
+
+
+class ApplySessionResponse(BaseModel):
+    created: list[dict]
+
+
+@router.post("", status_code=201)
+def start_session(project_id: str, body: StartSessionRequest) -> dict:
+    paths = resolve_project_paths(project_id)
+    now = datetime.now(timezone.utc)
+    session = create_session(
+        paths,
+        title=body.title,
+        mode=body.mode,
+        created_at=now,
+        topic_id=body.topic_id,
+    )
+    return session.model_dump(mode="json")
+
+
+@router.get("/{session_id}")
+def get_session_detail(project_id: str, session_id: str) -> dict:
+    paths = resolve_project_paths(project_id)
+    try:
+        session = load_session(paths, session_id)
+    except (FileNotFoundError, KeyError, ValueError):
+        raise HTTPException(status_code=404, detail=f"Session not found: {session_id}") from None
+    proposals = []
+    for proposal_id in session.proposals:
+        try:
+            proposal = load_proposal(paths, proposal_id)
+            proposals.append(proposal.model_dump(mode="json"))
+        except KeyError:
+            continue
+    data = session.model_dump(mode="json")
+    data["proposals"] = proposals
+    return data
+
+
+@router.post("/{session_id}/import", response_model=ImportProposalsResponse)
+def import_proposals(
+    project_id: str,
+    session_id: str,
+    body: ImportProposalsRequest,
+) -> ImportProposalsResponse:
+    paths = resolve_project_paths(project_id)
+    try:
+        load_session(paths, session_id)
+    except (FileNotFoundError, KeyError, ValueError):
+        raise HTTPException(status_code=404, detail=f"Session not found: {session_id}") from None
+
+    bundle = parse_proposal_bundle(body.model_dump())
+    created: list[dict] = []
+    for item in bundle["proposals"]:
+        proposal = add_proposal(
+            paths,
+            session_id=session_id,
+            kind=item["kind"],
+            title=item["title"],
+            summary=item.get("summary", ""),
+            rationale=item.get("rationale", ""),
+            proposed_changes=item.get("proposed_changes", {}),
+            topic_id=item.get("topic_id"),
+        )
+        created.append(proposal.model_dump(mode="json"))
+    return ImportProposalsResponse(count=len(created), proposals=created)
+
+
+@router.post("/{session_id}/apply", response_model=ApplySessionResponse)
+def apply_session_route(
+    project_id: str,
+    session_id: str,
+    force: bool = False,
+) -> ApplySessionResponse:
+    paths = resolve_project_paths(project_id)
+    try:
+        load_session(paths, session_id)
+    except (FileNotFoundError, KeyError, ValueError):
+        raise HTTPException(status_code=404, detail=f"Session not found: {session_id}") from None
+    try:
+        created = apply_session(paths, session_id, force=force)
+    except ApplyConflictError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return ApplySessionResponse(
+        created=[topic.model_dump(mode="json") for topic in created],
+    )
