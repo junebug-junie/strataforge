@@ -1,0 +1,31 @@
+[project]
+name = "strataforge"
+version = "0.1.0"
+description = "Local-first HITL architecture design pairing plane"
+requires-python = ">=3.11"
+dependencies = [
+  "typer>=0.12",
+  "pydantic>=2.7",
+  "pydantic-settings>=2.2",
+  "pyyaml>=6.0",
+  "python-frontmatter>=1.1",
+  "fastapi>=0.111",
+  "uvicorn[standard]>=0.29",
+  "jinja2>=3.1",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.2", "httpx>=0.27", "ruff>=0.4"]
+
+[project.scripts]
+strata = "strataforge.cli:app"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["strataforge"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

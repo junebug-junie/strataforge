@@ -1,0 +1,26 @@
+{
+  "proposals": [
+    {
+      "kind": "create_component",
+      "title": "Session Runtime",
+      "summary": "Core session lifecycle area",
+      "proposed_changes": {
+        "area_slug": "01-session-runtime",
+        "topic_id": "topic:session-runtime",
+        "title": "Session Runtime",
+        "level": "area"
+      }
+    },
+    {
+      "kind": "create_component",
+      "title": "Agent Runtime",
+      "summary": "Deferred to v1",
+      "proposed_changes": {
+        "area_slug": "09-agent",
+        "topic_id": "topic:agent-runtime",
+        "title": "Agent Runtime",
+        "level": "area"
+      }
+    }
+  ]
+}

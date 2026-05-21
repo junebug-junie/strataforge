@@ -1,0 +1,25 @@
+services:
+  strata-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      - STRATA_WORKSPACE_ROOT=/app/workspaces
+      - STRATA_DB_PATH=/app/.strata/strata.db
+      - STRATA_LLM_PROVIDER=manual
+    volumes:
+      - ./workspaces:/app/workspaces
+      - ./.strata:/app/.strata
+    ports:
+      - "8787:8787"
+
+  strata-ui:
+    build:
+      context: ./strataforge/ui
+      dockerfile: Dockerfile
+      args:
+        VITE_STRATA_API_BASE: /strataforge
+    ports:
+      - "8788:80"
+    depends_on:
+      - strata-api
