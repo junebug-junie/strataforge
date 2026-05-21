@@ -8,7 +8,7 @@ import {
 } from "../api";
 import { useToast } from "./Toast";
 
-const COVERAGE_BADGES: { key: keyof CoverageFlags; label: string }[] = [
+const COVERAGE_FLAGS: { key: keyof CoverageFlags; label: string }[] = [
   { key: "concept_addressed", label: "Concept addressed" },
   { key: "concept_solved", label: "Concept solved" },
   { key: "out_of_scope", label: "Out of scope" },
@@ -55,7 +55,6 @@ export default function TopicEditor({ projectId, topicId, onUpdated }: TopicEdit
     try {
       const updated = await updateTopic(projectId, topicId, patch, currentCoverage);
       setDetail((prev) => (prev ? { ...prev, topic: updated } : prev));
-      notify("Topic updated.", "success");
       onUpdated?.();
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Update failed";
@@ -66,31 +65,25 @@ export default function TopicEditor({ projectId, topicId, onUpdated }: TopicEdit
     }
   };
 
-  const handleOutOfScope = () => {
+  const toggleCoverage = (key: keyof CoverageFlags) => {
     if (!detail) {
       notify(loading ? "Still loading topic…" : "Topic not loaded yet", "error");
       return;
     }
-    notify("Marking out of scope…", "info");
-    void applyUpdate(
-      {
-        review_state: "out_of_scope",
-        coverage: { ...detail.topic.coverage, out_of_scope: true },
-      },
-      detail.topic.coverage,
-    );
-  };
+    const current = detail.topic.coverage[key];
+    const nextVal = !current;
+    const nextCoverage = { ...detail.topic.coverage, [key]: nextVal };
+    const patch: Parameters<typeof updateTopic>[2] = { coverage: nextCoverage };
 
-  const handleNeedsDesign = () => {
-    if (!detail) {
-      notify(loading ? "Still loading topic…" : "Topic not loaded yet", "error");
-      return;
+    if (key === "out_of_scope") {
+      patch.review_state = nextVal ? "out_of_scope" : "accepted";
     }
-    notify("Setting needs design…", "info");
-    void applyUpdate(
-      { coverage: { ...detail.topic.coverage, needs_design: true } },
-      detail.topic.coverage,
-    );
+
+    const label = COVERAGE_FLAGS.find((f) => f.key === key)?.label ?? key;
+    notify(`${nextVal ? "Set" : "Cleared"} ${label}.`, "info");
+    void applyUpdate(patch, detail.topic.coverage).then(() => {
+      notify(`${label} ${nextVal ? "on" : "off"}.`, "success");
+    });
   };
 
   const handleExecutionReady = () => {
@@ -98,8 +91,14 @@ export default function TopicEditor({ projectId, topicId, onUpdated }: TopicEdit
       notify(loading ? "Still loading topic…" : "Topic not loaded yet", "error");
       return;
     }
+    if (detail.topic.status === "execution_ready") {
+      notify("Already execution ready (status is one-way in MVP).", "info");
+      return;
+    }
     notify("Promoting to execution ready…", "info");
-    void applyUpdate({ status: "execution_ready" });
+    void applyUpdate({ status: "execution_ready" }, detail.topic.coverage).then(() => {
+      notify("Status set to execution ready.", "success");
+    });
   };
 
   const copyPrompt = async (command: "expand" | "reconcile-parent", label: string) => {
@@ -144,59 +143,56 @@ export default function TopicEditor({ projectId, topicId, onUpdated }: TopicEdit
             Review: <strong>{topic.review_state}</strong>
           </span>
         </p>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginTop: "8px" }}>
-          {COVERAGE_BADGES.map(({ key, label }) => {
-            const active = topic.coverage[key];
-            return (
-              <span
-                key={key}
-                style={{
-                  fontSize: "12px",
-                  padding: "2px 8px",
-                  borderRadius: "4px",
-                  background: active ? "#dbeafe" : "#f3f4f6",
-                  color: active ? "#1e40af" : "#9ca3af",
-                  border: `1px solid ${active ? "#93c5fd" : "#e5e7eb"}`,
-                }}
-              >
-                {label}
-              </span>
-            );
-          })}
-        </div>
       </header>
 
       <section style={{ marginBottom: "16px" }}>
-        <h3 style={{ margin: "0 0 8px", fontSize: "14px", fontWeight: 600 }}>Gates</h3>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
-          <button
-            type="button"
-            disabled={updating}
-            onClick={handleOutOfScope}
-            style={{ padding: "6px 12px", fontSize: "13px", cursor: "pointer" }}
-          >
-            Mark out of scope
-          </button>
-          <button
-            type="button"
-            disabled={updating}
-            onClick={handleNeedsDesign}
-            style={{ padding: "6px 12px", fontSize: "13px", cursor: "pointer" }}
-          >
-            Needs design
-          </button>
-          <button
-            type="button"
-            disabled={updating || topic.status === "execution_ready"}
-            onClick={handleExecutionReady}
-            style={{ padding: "6px 12px", fontSize: "13px", cursor: "pointer" }}
-          >
-            Execution ready
-          </button>
+        <h3 style={{ margin: "0 0 4px", fontSize: "14px", fontWeight: 600 }}>Coverage flags</h3>
+        <p style={{ margin: "0 0 8px", fontSize: "12px", color: "#6b7280" }}>
+          Click a flag to turn it on or off (saved to topic file).
+        </p>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+          {COVERAGE_FLAGS.map(({ key, label }) => {
+            const active = topic.coverage[key];
+            return (
+              <button
+                key={key}
+                type="button"
+                disabled={updating}
+                aria-pressed={active}
+                title={active ? `Clear ${label}` : `Set ${label}`}
+                onClick={() => toggleCoverage(key)}
+                style={{
+                  fontSize: "12px",
+                  padding: "4px 10px",
+                  borderRadius: "999px",
+                  cursor: updating ? "wait" : "pointer",
+                  background: active ? "#dbeafe" : "#fff",
+                  color: active ? "#1e40af" : "#6b7280",
+                  border: `1px solid ${active ? "#6366f1" : "#d1d5db"}`,
+                  fontWeight: active ? 600 : 400,
+                }}
+              >
+                {active ? "✓ " : ""}
+                {label}
+              </button>
+            );
+          })}
         </div>
         {actionError && (
           <p style={{ margin: "8px 0 0", fontSize: "13px", color: "#b91c1c" }}>{actionError}</p>
         )}
+      </section>
+
+      <section style={{ marginBottom: "16px" }}>
+        <h3 style={{ margin: "0 0 8px", fontSize: "14px", fontWeight: 600 }}>Status promotion</h3>
+        <button
+          type="button"
+          disabled={updating || topic.status === "execution_ready"}
+          onClick={handleExecutionReady}
+          style={{ padding: "6px 12px", fontSize: "13px", cursor: "pointer" }}
+        >
+          {topic.status === "execution_ready" ? "Execution ready ✓" : "Mark execution ready"}
+        </button>
       </section>
 
       <section style={{ marginBottom: "16px" }}>

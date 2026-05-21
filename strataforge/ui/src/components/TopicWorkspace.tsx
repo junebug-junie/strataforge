@@ -33,9 +33,16 @@ export default function TopicWorkspace({
     }
   }, [projectId, topicId, notify]);
 
-  const stubAction = (label: string) => {
-    notify(`${label} — coming soon (use expansion + link session).`, "info");
-  };
+  const copyReconcile = useCallback(async () => {
+    notify("Copying reconciliation prompt…", "info");
+    try {
+      const prompt = await getTopicPrompt(projectId, topicId, "reconcile-parent");
+      await navigator.clipboard.writeText(prompt);
+      notify("Reconciliation prompt copied to clipboard.", "success");
+    } catch (err) {
+      notify(err instanceof Error ? err.message : "Failed to copy prompt", "error");
+    }
+  }, [projectId, topicId, notify]);
 
   return (
     <div className="topic-workspace" style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
@@ -61,13 +68,25 @@ export default function TopicWorkspace({
         <button type="button" onClick={() => void copyExpand()} style={actionBtnStyle}>
           Expand
         </button>
-        <button type="button" onClick={() => stubAction("Decompose")} style={actionBtnStyle}>
+        <button
+          type="button"
+          onClick={() =>
+            notify("Decompose: start a link/decompose session (coming soon). Use Expand for now.", "info")
+          }
+          style={actionBtnStyle}
+        >
           Decompose
         </button>
-        <button type="button" onClick={() => stubAction("Add link")} style={actionBtnStyle}>
+        <button
+          type="button"
+          onClick={() =>
+            notify("Add link: use intake/link session after expansion (coming soon).", "info")
+          }
+          style={actionBtnStyle}
+        >
           Add link
         </button>
-        <button type="button" onClick={() => stubAction("Boundary check")} style={actionBtnStyle}>
+        <button type="button" onClick={() => void copyReconcile()} style={actionBtnStyle}>
           Boundary check
         </button>
       </div>
