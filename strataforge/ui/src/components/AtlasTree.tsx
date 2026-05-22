@@ -53,23 +53,14 @@ function TreeBranch({
     <li>
       <button
         type="button"
+        className={`atlas-row${selected ? " is-selected" : ""}`}
+        style={{ paddingLeft: `${12 + depth * 16}px` }}
         onClick={() => onSelect(node.id)}
-        style={{
-          display: "block",
-          width: "100%",
-          textAlign: "left",
-          padding: "4px 8px",
-          paddingLeft: `${8 + depth * 16}px`,
-          border: "none",
-          background: selected ? "#e0e7ff" : "transparent",
-          cursor: "pointer",
-          fontSize: "14px",
-        }}
       >
         {node.title}
       </button>
       {node.children.length > 0 && (
-        <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
+        <ul className="atlas-tree">
           {node.children.map((child) => (
             <TreeBranch
               key={child.id}
@@ -89,7 +80,7 @@ export default function AtlasTree({ topics, selectedTopicId, onSelect }: AtlasTr
   const roots = buildTree(topics);
 
   if (topics.length === 0) {
-    return <p style={{ margin: 0, color: "#666" }}>No topics yet</p>;
+    return <p className="sf-muted" style={{ margin: 0 }}>No topics yet</p>;
   }
 
   const flatOnly = roots.every((node) => node.children.length === 0);
@@ -97,30 +88,14 @@ export default function AtlasTree({ topics, selectedTopicId, onSelect }: AtlasTr
   if (flatOnly) {
     return (
       <nav aria-label="Atlas tree">
-        <ul
-          style={{
-            listStyle: "none",
-            margin: 0,
-            padding: 0,
-            display: "flex",
-            flexWrap: "wrap",
-            gap: "6px",
-          }}
-        >
+        <ul className="atlas-tree atlas-tree--chips">
           {roots.map((node) => (
             <li key={node.id}>
               <button
                 type="button"
+                data-testid={`atlas-topic-${node.id}`}
+                className={`atlas-chip${node.id === selectedTopicId ? " is-selected" : ""}`}
                 onClick={() => onSelect(node.id)}
-                style={{
-                  padding: "6px 12px",
-                  border: `1px solid ${node.id === selectedTopicId ? "#6366f1" : "#d1d5db"}`,
-                  background: node.id === selectedTopicId ? "#eef2ff" : "#fff",
-                  cursor: "pointer",
-                  fontSize: "13px",
-                  borderRadius: "999px",
-                  color: "#111827",
-                }}
               >
                 {node.title}
               </button>
@@ -133,7 +108,7 @@ export default function AtlasTree({ topics, selectedTopicId, onSelect }: AtlasTr
 
   return (
     <nav aria-label="Atlas tree">
-      <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
+      <ul className="atlas-tree">
         {roots.map((node) => (
           <TreeBranch
             key={node.id}

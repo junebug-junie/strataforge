@@ -99,3 +99,22 @@ def test_ui_session_resume_and_prompt_endpoints(tmp_path, monkeypatch):
         json={"proposals": [{"title": "no kind"}]},
     )
     assert bad_import.status_code == 422
+
+    context = client.get(f"/api/projects/{pid}/topics/topic:runtime/context")
+    assert context.status_code == 200
+    ctx = context.json()
+    assert ctx["topic"]["id"] == "topic:runtime"
+    assert isinstance(ctx["recommended_commands"], list)
+
+    boundary = client.get(f"/api/projects/{pid}/topics/topic:runtime/prompts/boundary-check")
+    assert boundary.status_code == 200
+
+    llm_status = client.get("/api/llm/status")
+    assert llm_status.status_code == 200
+    assert "configured" in llm_status.json()
+
+    pipeline = client.post(
+        f"/api/projects/{pid}/sessions/{session_id}/llm/pipeline",
+        json={"command": "intake", "accept_all": False, "apply": False},
+    )
+    assert pipeline.status_code in (502, 503)

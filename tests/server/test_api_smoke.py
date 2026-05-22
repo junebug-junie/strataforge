@@ -109,6 +109,66 @@ def test_update_topic(tmp_path: Path, monkeypatch):
     assert updated["status"] == "expanded"
 
 
+def test_toggle_out_of_scope_coverage(tmp_path: Path, monkeypatch):
+    client = _client(tmp_path, monkeypatch)
+    created = client.post("/api/projects", json={"title": "P"}).json()
+    pid = created["project_id"]
+
+    from strataforge.core.paths import ProjectPaths
+    from strataforge.core.topic_store import create_topic_scaffold
+
+    paths = None
+    for d in tmp_path.iterdir():
+        if d.is_dir() and (d / "strata.yaml").exists():
+            paths = ProjectPaths(d)
+            break
+    create_topic_scaffold(
+        paths,
+        topic_id="topic:runtime",
+        title="Runtime",
+        area_slug="01-runtime",
+        parent_id=None,
+        level="area",
+    )
+
+    on = client.put(
+        f"/api/projects/{pid}/topics/topic:runtime",
+        json={
+            "review_state": "out_of_scope",
+            "coverage": {
+                "concept_addressed": False,
+                "concept_solved": False,
+                "out_of_scope": True,
+                "needs_design": True,
+                "needs_reconciliation": False,
+                "needs_code_review": False,
+                "needs_implementation": False,
+            },
+        },
+    )
+    assert on.status_code == 200
+    assert on.json()["coverage"]["out_of_scope"] is True
+
+    off = client.put(
+        f"/api/projects/{pid}/topics/topic:runtime",
+        json={
+            "review_state": "accepted",
+            "coverage": {
+                "concept_addressed": False,
+                "concept_solved": False,
+                "out_of_scope": False,
+                "needs_design": True,
+                "needs_reconciliation": False,
+                "needs_code_review": False,
+                "needs_implementation": False,
+            },
+        },
+    )
+    assert off.status_code == 200
+    assert off.json()["coverage"]["out_of_scope"] is False
+    assert off.json()["review_state"] == "accepted"
+
+
 def test_session_import_accept_apply(tmp_path: Path, monkeypatch):
     client = _client(tmp_path, monkeypatch)
     created = client.post("/api/projects", json={"title": "P"}).json()

@@ -6,7 +6,11 @@ services:
     environment:
       - STRATA_WORKSPACE_ROOT=/app/workspaces
       - STRATA_DB_PATH=/app/.strata/strata.db
-      - STRATA_LLM_PROVIDER=manual
+      - STRATA_LLM_PROVIDER=${STRATA_LLM_PROVIDER:-manual}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - OPENAI_BASE_URL=${OPENAI_BASE_URL:-https://api.openai.com/v1}
+      - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4o-mini}
+      - OPENAI_TEMPERATURE=${OPENAI_TEMPERATURE:-0.2}
     volumes:
       - ./workspaces:/app/workspaces
       - ./.strata:/app/.strata

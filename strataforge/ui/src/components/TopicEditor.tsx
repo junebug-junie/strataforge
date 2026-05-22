@@ -6,8 +6,11 @@ import {
   type CoverageFlags,
   type TopicDetail,
 } from "../api";
+import { copyToClipboard } from "../lib/clipboard";
+import { advanceStatusLabel, nextDesignStatus } from "../lib/status";
+import { useToast } from "./Toast";
 
-const COVERAGE_BADGES: { key: keyof CoverageFlags; label: string }[] = [
+const COVERAGE_FLAGS: { key: keyof CoverageFlags; label: string }[] = [
   { key: "concept_addressed", label: "Concept addressed" },
   { key: "concept_solved", label: "Concept solved" },
   { key: "out_of_scope", label: "Out of scope" },
@@ -30,6 +33,7 @@ export default function TopicEditor({ projectId, topicId, onUpdated }: TopicEdit
   const [actionError, setActionError] = useState<string | null>(null);
   const [promptMessage, setPromptMessage] = useState<string | null>(null);
   const [updating, setUpdating] = useState(false);
+  const notify = useToast();
 
   const loadTopic = useCallback(() => {
     setLoading(true);
@@ -55,33 +59,57 @@ export default function TopicEditor({ projectId, topicId, onUpdated }: TopicEdit
       setDetail((prev) => (prev ? { ...prev, topic: updated } : prev));
       onUpdated?.();
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : "Update failed");
+      const msg = err instanceof Error ? err.message : "Update failed";
+      setActionError(msg);
+      notify(msg, "error");
     } finally {
       setUpdating(false);
     }
   };
 
-  const handleOutOfScope = () => {
-    if (!detail) return;
-    void applyUpdate(
-      {
-        review_state: "out_of_scope",
-        coverage: { ...detail.topic.coverage, out_of_scope: true },
-      },
-      detail.topic.coverage,
-    );
+  const toggleCoverage = (key: keyof CoverageFlags) => {
+    if (!detail) {
+      notify(loading ? "Still loading topic…" : "Topic not loaded yet", "error");
+      return;
+    }
+    const current = detail.topic.coverage[key];
+    const nextVal = !current;
+    const nextCoverage = { ...detail.topic.coverage, [key]: nextVal };
+    const patch: Parameters<typeof updateTopic>[2] = { coverage: nextCoverage };
+
+    if (key === "out_of_scope") {
+      patch.review_state = nextVal ? "out_of_scope" : "accepted";
+    }
+
+    const label = COVERAGE_FLAGS.find((f) => f.key === key)?.label ?? key;
+    void (async () => {
+      try {
+        await applyUpdate(patch, detail.topic.coverage);
+        notify(`${label} ${nextVal ? "on" : "off"}.`, "success");
+      } catch {
+        /* applyUpdate already toasts */
+      }
+    })();
   };
 
-  const handleNeedsDesign = () => {
-    if (!detail) return;
-    void applyUpdate(
-      { coverage: { ...detail.topic.coverage, needs_design: true } },
-      detail.topic.coverage,
-    );
-  };
-
-  const handleExecutionReady = () => {
-    void applyUpdate({ status: "execution_ready" });
+  const handleAdvanceStatus = () => {
+    if (!detail) {
+      notify(loading ? "Still loading topic…" : "Topic not loaded yet", "error");
+      return;
+    }
+    const next = nextDesignStatus(detail.topic.status);
+    if (!next) {
+      notify("Already at execution ready (MVP chain ends here).", "info");
+      return;
+    }
+    void (async () => {
+      try {
+        await applyUpdate({ status: next }, detail.topic.coverage);
+        notify(`Status advanced to ${next.replace("_", " ")}.`, "success");
+      } catch {
+        /* applyUpdate already toasts */
+      }
+    })();
   };
 
   const copyPrompt = async (command: "expand" | "reconcile-parent", label: string) => {
@@ -89,19 +117,26 @@ export default function TopicEditor({ projectId, topicId, onUpdated }: TopicEdit
     setActionError(null);
     try {
       const prompt = await getTopicPrompt(projectId, topicId, command);
-      await navigator.clipboard.writeText(prompt);
-      setPromptMessage(`${label} copied to clipboard.`);
+      const ok = await copyToClipboard(prompt);
+      if (ok) {
+        setPromptMessage(`${label} copied to clipboard.`);
+        notify(`${label} copied to clipboard.`, "success");
+      } else {
+        notify("Could not copy — check browser clipboard permissions.", "error");
+      }
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : "Failed to copy prompt");
+      const msg = err instanceof Error ? err.message : "Failed to copy prompt";
+      setActionError(msg);
+      notify(msg, "error");
     }
   };
 
   if (loading) {
-    return <p style={{ color: "#666" }}>Loading topic…</p>;
+    return <p className="sf-muted">Loading topic…</p>;
   }
 
   if (error) {
-    return <p style={{ color: "#b91c1c" }}>{error}</p>;
+    return <p className="sf-error-text">{error}</p>;
   }
 
   if (!detail) {
@@ -111,115 +146,98 @@ export default function TopicEditor({ projectId, topicId, onUpdated }: TopicEdit
   const { topic, body } = detail;
 
   return (
-    <article style={{ textAlign: "left" }}>
-      <header style={{ marginBottom: "16px" }}>
-        <h2 style={{ margin: "0 0 8px", fontSize: "22px", fontWeight: 600 }}>{topic.title}</h2>
-        <p style={{ margin: "0 0 4px", fontSize: "13px", color: "#666" }}>
-          <span style={{ marginRight: "12px" }}>
-            Status: <strong>{topic.status}</strong>
+    <article>
+      <header style={{ marginBottom: "20px" }}>
+        <h2 style={{ margin: "0 0 8px", fontSize: "20px", fontWeight: 700, letterSpacing: "-0.02em" }}>
+          {topic.title}
+        </h2>
+        <p className="sf-muted" style={{ margin: 0, fontSize: "13px" }}>
+          <span style={{ marginRight: "16px" }}>
+            Status <span className="status-badge">{topic.status}</span>
           </span>
           <span>
-            Review: <strong>{topic.review_state}</strong>
+            Review <span className="status-badge">{topic.review_state}</span>
           </span>
         </p>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginTop: "8px" }}>
-          {COVERAGE_BADGES.map(({ key, label }) => {
+      </header>
+
+      <section className="sf-section">
+        <h3 className="sf-section-title">Coverage flags</h3>
+        <p className="sf-hint">Click a flag to turn it on or off (saved to topic file).</p>
+        <div className="btn-group" style={{ marginTop: "10px" }}>
+          {COVERAGE_FLAGS.map(({ key, label }) => {
             const active = topic.coverage[key];
             return (
-              <span
+              <button
                 key={key}
-                style={{
-                  fontSize: "12px",
-                  padding: "2px 8px",
-                  borderRadius: "4px",
-                  background: active ? "#dbeafe" : "#f3f4f6",
-                  color: active ? "#1e40af" : "#9ca3af",
-                  border: `1px solid ${active ? "#93c5fd" : "#e5e7eb"}`,
-                }}
+                type="button"
+                disabled={updating}
+                aria-pressed={active}
+                data-testid={`coverage-${key}`}
+                title={active ? `Clear ${label}` : `Set ${label}`}
+                onClick={() => toggleCoverage(key)}
+                className="flag-pill"
               >
+                {active ? "✓ " : ""}
                 {label}
-              </span>
+              </button>
             );
           })}
         </div>
-      </header>
-
-      <section style={{ marginBottom: "16px" }}>
-        <h3 style={{ margin: "0 0 8px", fontSize: "14px", fontWeight: 600 }}>Gates</h3>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
-          <button
-            type="button"
-            disabled={updating}
-            onClick={handleOutOfScope}
-            style={{ padding: "6px 12px", fontSize: "13px", cursor: "pointer" }}
-          >
-            Mark out of scope
-          </button>
-          <button
-            type="button"
-            disabled={updating}
-            onClick={handleNeedsDesign}
-            style={{ padding: "6px 12px", fontSize: "13px", cursor: "pointer" }}
-          >
-            Needs design
-          </button>
-          <button
-            type="button"
-            disabled={updating || topic.status === "execution_ready"}
-            onClick={handleExecutionReady}
-            style={{ padding: "6px 12px", fontSize: "13px", cursor: "pointer" }}
-          >
-            Execution ready
-          </button>
-        </div>
-        {actionError && (
-          <p style={{ margin: "8px 0 0", fontSize: "13px", color: "#b91c1c" }}>{actionError}</p>
-        )}
+        {actionError && <p className="sf-error-text" style={{ marginTop: "8px" }}>{actionError}</p>}
       </section>
 
-      <section style={{ marginBottom: "16px" }}>
-        <h3 style={{ margin: "0 0 8px", fontSize: "14px", fontWeight: 600 }}>LLM prompts</h3>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+      <section className="sf-section">
+        <h3 className="sf-section-title">Status promotion</h3>
+        <p className="sf-hint">
+          scaffolded → expanded → reconciled → execution ready (one step per click)
+        </p>
+        <button
+          type="button"
+          className="btn btn--primary"
+          data-testid="advance-status"
+          disabled={updating || nextDesignStatus(topic.status) === null}
+          onClick={handleAdvanceStatus}
+          style={{ marginTop: "8px" }}
+        >
+          {advanceStatusLabel(topic.status)}
+        </button>
+      </section>
+
+      <section className="sf-section">
+        <h3 className="sf-section-title">LLM prompts</h3>
+        <p className="sf-hint">
+          Copies a prompt to clipboard → paste in ChatGPT/Claude → use the reply in the topic body or notes.
+          For structured changes (children, links), use Decompose / Add link in the toolbar above.
+        </p>
+        <div className="btn-group">
           <button
             type="button"
+            className="btn"
+            data-testid="copy-expand-prompt"
             disabled={updating}
             onClick={() => void copyPrompt("expand", "Expansion prompt")}
-            style={{ padding: "6px 12px", fontSize: "13px", cursor: "pointer" }}
           >
             Copy expansion prompt
           </button>
           <button
             type="button"
+            className="btn"
+            data-testid="copy-reconcile-prompt"
             disabled={updating}
             onClick={() => void copyPrompt("reconcile-parent", "Reconciliation prompt")}
-            style={{ padding: "6px 12px", fontSize: "13px", cursor: "pointer" }}
           >
             Copy reconcile prompt
           </button>
         </div>
         {promptMessage && (
-          <p style={{ margin: "8px 0 0", fontSize: "13px", color: "#059669" }}>{promptMessage}</p>
+          <p style={{ margin: "8px 0 0", fontSize: "13px", color: "var(--sf-success)" }}>{promptMessage}</p>
         )}
       </section>
 
-      <section>
-        <h3 style={{ margin: "0 0 8px", fontSize: "14px", fontWeight: 600 }}>Body</h3>
-        <pre
-          style={{
-            margin: 0,
-            padding: "12px",
-            background: "#f9fafb",
-            border: "1px solid #e5e7eb",
-            borderRadius: "6px",
-            fontSize: "13px",
-            lineHeight: 1.5,
-            whiteSpace: "pre-wrap",
-            overflow: "auto",
-            maxHeight: "60vh",
-          }}
-        >
-          {body || "(empty)"}
-        </pre>
+      <section className="sf-section">
+        <h3 className="sf-section-title">Body</h3>
+        <pre className="sf-pre">{body || "(empty)"}</pre>
       </section>
     </article>
   );

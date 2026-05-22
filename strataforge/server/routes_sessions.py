@@ -7,7 +7,7 @@ from strataforge.core.apply_engine import ApplyConflictError, apply_session
 from strataforge.core.proposal_store import add_proposal, load_proposal
 from strataforge.core.session_store import create_session, list_sessions, load_session, save_session
 from strataforge.llm.manual_import import ProposalBundleError, parse_proposal_bundle
-from strataforge.llm.prompts import build_intake_prompt
+from strataforge.llm.prompts import build_decompose_prompt, build_intake_prompt, build_link_prompt
 from strataforge.server.deps import resolve_project_paths
 
 router = APIRouter(prefix="/api/projects/{project_id}/sessions", tags=["sessions"])
@@ -34,8 +34,8 @@ class ApplySessionResponse(BaseModel):
     created: list[dict]
 
 
-class IntakePromptResponse(BaseModel):
-    command: str = "intake"
+class SessionPromptResponse(BaseModel):
+    command: str
     session_id: str
     prompt: str
 
@@ -86,22 +86,34 @@ def get_session_detail(project_id: str, session_id: str) -> dict:
     return data
 
 
-@router.get("/{session_id}/prompts/intake", response_model=IntakePromptResponse)
-def get_intake_prompt(
+@router.get("/{session_id}/prompts/{command}", response_model=SessionPromptResponse)
+def get_session_prompt(
     project_id: str,
     session_id: str,
+    command: str,
     source_prompt: str | None = None,
-) -> IntakePromptResponse:
+) -> SessionPromptResponse:
     paths = resolve_project_paths(project_id)
     try:
         session = load_session(paths, session_id)
     except (FileNotFoundError, KeyError, ValueError):
         raise HTTPException(status_code=404, detail=f"Session not found: {session_id}") from None
 
-    saved_prompt = session.inputs.get("source_prompt", "")
-    idea = source_prompt if source_prompt is not None else str(saved_prompt or "")
-    prompt = build_intake_prompt(paths, session_id=session_id, source_prompt=idea)
-    return IntakePromptResponse(session_id=session_id, prompt=prompt)
+    if command == "intake":
+        saved_prompt = session.inputs.get("source_prompt", "")
+        idea = source_prompt if source_prompt is not None else str(saved_prompt or "")
+        prompt = build_intake_prompt(paths, session_id=session_id, source_prompt=idea)
+    elif command == "decompose":
+        if not session.topic_id:
+            raise HTTPException(status_code=400, detail="Session has no topic_id for decompose")
+        prompt = build_decompose_prompt(paths, session.topic_id, session_id=session_id)
+    elif command == "link":
+        if not session.topic_id:
+            raise HTTPException(status_code=400, detail="Session has no topic_id for link")
+        prompt = build_link_prompt(paths, session.topic_id, session_id=session_id)
+    else:
+        raise HTTPException(status_code=400, detail=f"Unknown prompt command: {command}")
+    return SessionPromptResponse(command=command, session_id=session_id, prompt=prompt)
 
 
 @router.put("/{session_id}")
